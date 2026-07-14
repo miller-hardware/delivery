@@ -96,6 +96,8 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 .cname{font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmeta{font-size:.82rem;color:var(--g5);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card-added-by{font-size:.72rem;color:var(--g3);margin-top:2px;font-style:italic}
+.card-coworker-btn{background:none;border:1px solid var(--bd);color:var(--g5);border-radius:6px;width:32px;height:32px;font-size:1rem;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.card-coworker-btn:hover{border-color:var(--ink);color:var(--ink)}
 .crow-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
 .chev{color:var(--g3);font-size:1.1rem;margin-left:2px;flex-shrink:0}
 
@@ -301,7 +303,6 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 .exp-btn:hover{opacity:.88}
 
 /* PASSWORD */
-.pw-modal{max-width:340px}
 
 /* LIGHTBOX */
 .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:2000;align-items:center;justify-content:center;padding:16px}
@@ -734,20 +735,15 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
   </div>
 </div>
 
-<!-- PASSWORD -->
-<div class="overlay" id="pw-overlay" style="z-index:1500">
-  <div class="modal center pw-modal">
-    <div class="mhdr"><span class="mtitle">Confirm Delete</span><button class="mclose" onclick="closeAll()">×</button></div>
-    <div class="mbody">
-      <div class="fgrp">
-        <label>Enter Password</label>
-        <input type="password" id="pw-inp" placeholder="••••••••••" onkeydown="if(event.key==='Enter')submitPW()" style="font-size:1.1rem;letter-spacing:3px;text-align:center">
-        <div id="pw-err" style="display:none;color:var(--red);font-family:'Barlow Condensed',sans-serif;font-size:.88rem;font-weight:700;margin-top:6px;letter-spacing:1px;text-align:center">Incorrect password.</div>
-      </div>
-    </div>
-    <div class="mfoot"><button class="btn-cancel" onclick="closeAll()">Cancel</button><button class="btn-save" style="background:var(--red)" onclick="submitPW()">Delete</button></div>
+<!-- TEXT A COWORKER -->
+<div class="overlay" id="coworker-popup">
+  <div class="modal center" style="max-width:380px;border-radius:8px;margin:auto">
+    <div class="mhdr"><span class="mtitle">Text a Coworker</span><button class="mclose" onclick="closeAll()">×</button></div>
+    <div class="mbody" id="coworker-popup-body"></div>
+    <div class="mfoot"><button class="btn-cancel" onclick="closeAll()">Close</button></div>
   </div>
 </div>
+
 
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" onclick="document.getElementById('lightbox').classList.remove('open')">
@@ -1445,7 +1441,10 @@ function openDetOut(key){
         <div><div class="dlbl">Phone</div><div class="dval">${esc(phone||'—')}</div></div>
         <div style="grid-column:1/-1"><div class="dlbl">Address</div><div class="dval">${esc(custAddr(r.custId)||'—')}</div></div>
       </div>
-      ${phone?`<div class="notify-row"><button class="sbtn-ghost" onclick="textDeliveryCustomer('${key}')">💬 Text Customer</button></div>`:''}
+      <div class="notify-row">
+        ${phone?`<button class="sbtn-ghost" onclick="textDeliveryCustomer('${key}')">💬 Text Customer</button>`:''}
+        <button class="sbtn-ghost" onclick="openCoworkerPopup('out','${key}')">👥 Text Coworker</button>
+      </div>
     </div>
     <div class="dsec"><div class="dsec-title">Details</div>
       <div class="dgrid">
@@ -1477,7 +1476,7 @@ function openDetOut(key){
       </div>
       ${(r.deliveryPhoto||r.signature)?`<div style="margin-top:10px"><button class="btn btn-ink" style="width:100%" onclick="printPOD('${key}')">🖨 Print Proof of Delivery</button></div>`:''}
     </div>`;
-  document.getElementById('det-out-del').onclick=()=>pwDelete(()=>{R.out.child(key).remove();closeAll();});
+  document.getElementById('det-out-del').onclick=()=>requireAdminDelete('Delete this delivery? This cannot be undone.',()=>{R.out.child(key).remove();closeAll();});
   document.getElementById('det-out-edit').onclick=()=>{closeAll();openOutForm(key);};
   openOv('det-out');
 }
@@ -1512,6 +1511,7 @@ function renderOut(){
             ${r.createdBy?`<div class="card-added-by">Added by ${esc(r.createdBy)}</div>`:''}
           </div>
           <div class="crow-right"><span class="badge ${OUT_BDGE[r.status]||''}">${r.status}</span></div>
+          <button class="card-coworker-btn" onclick="event.stopPropagation();openCoworkerPopup('out','${r._k}')" title="Text a coworker">👥</button>
           <div class="chev">›</div>
         </div>
       </div>`).join('');
@@ -1708,24 +1708,31 @@ function textSpecialOrderCustomer(key){
   sendSMS(c.phone, msg);
 }
 
-function openStaffTextPicker(key){
-  const r = inRecs.find(x=>x._k===key); if(!r) return;
-  const wrap = document.getElementById('det-in-staff-pick');
-  if(!wrap) return;
-  if(!staffList.length){ wrap.innerHTML = '<div style="font-size:.85rem;color:var(--g5);font-style:italic;margin-top:8px">No staff saved yet — add coworkers in Settings.</div>'; return; }
-  wrap.innerHTML = `<div class="staff-pick">${staffList.map(st=>`
-    <div class="staff-pick-row">
-      <span>${esc(st.name)}</span>
-      <button class="sbtn-ghost" onclick="textStaffAboutOrder('${key}','${st._k}')">Text</button>
-    </div>`).join('')}</div>`;
+// ── TEXT A COWORKER (works the same way across every record type) ────────────
+function buildCoworkerMsg(kind, key){
+  if(kind==='out'){ const r=outRecs.find(x=>x._k===key); if(!r) return ''; return `Heads up — delivery for ${custName(r.custId)} (${fmtDate(r.date)}) needs attention.`; }
+  if(kind==='in'){ const r=inRecs.find(x=>x._k===key); if(!r) return ''; const custLabel=r.isSpecialOrder&&r.custId?' for '+custName(r.custId):''; return `Heads up — order${custLabel} from ${r.vendor||'vendor'} (${r.items||'item'}) needs attention.`; }
+  if(kind==='ol'){ const r=olRecs.find(x=>x._k===key); if(!r) return ''; return `Heads up — order list item "${r.item}" needs attention.`; }
+  if(kind==='task'){ const r=taskRecs.find(x=>x._k===key); if(!r) return ''; return `Heads up — task "${r.title}" needs attention.`; }
+  return '';
 }
-
-function textStaffAboutOrder(orderKey, staffKey){
-  const r = inRecs.find(x=>x._k===orderKey); if(!r) return;
+function openCoworkerPopup(kind, key){
+  const body = document.getElementById('coworker-popup-body');
+  if(!staffList.length){
+    body.innerHTML = '<div style="font-size:.9rem;color:var(--g5);font-style:italic">No staff saved yet — add coworkers in Settings.</div>';
+  } else {
+    body.innerHTML = `<div class="staff-pick">${staffList.map(st=>`
+      <div class="staff-pick-row">
+        <span>${esc(st.name)}</span>
+        <button class="sbtn-ghost" onclick="textStaffGeneric('${kind}','${key}','${st._k}')">Text</button>
+      </div>`).join('')}</div>`;
+  }
+  openOv('coworker-popup');
+}
+function textStaffGeneric(kind, key, staffKey){
   const st = staffList.find(x=>x._k===staffKey); if(!st) return;
-  const custLabel = r.isSpecialOrder && r.custId ? ' for '+custName(r.custId) : '';
-  const msg = `Heads up — special order${custLabel} from ${r.vendor||'vendor'} (${r.items||'item'}) just came in.`;
-  sendSMS(st.phone, msg);
+  sendSMS(st.phone, buildCoworkerMsg(kind, key));
+  closeAll();
 }
 
 function openDetIn(key){
@@ -1762,11 +1769,10 @@ function openDetIn(key){
     <div class="dsec"><div class="dsec-title">Notify</div>
       <div class="notify-row">
         ${custPhoneOnFile?`<button class="sbtn-ghost" onclick="textSpecialOrderCustomer('${key}')">💬 Text Customer</button>`:''}
-        <button class="sbtn-ghost" onclick="openStaffTextPicker('${key}')">👥 Text Coworker</button>
+        <button class="sbtn-ghost" onclick="openCoworkerPopup('in','${key}')">👥 Text Coworker</button>
       </div>
-      <div id="det-in-staff-pick"></div>
     </div>`;
-  document.getElementById('det-in-del').onclick=()=>pwDelete(()=>{R.in.child(key).remove();closeAll();});
+  document.getElementById('det-in-del').onclick=()=>requireAdminDelete('Delete this inbound order? This cannot be undone.',()=>{R.in.child(key).remove();closeAll();});
   document.getElementById('det-in-edit').onclick=()=>{closeAll();openInForm(key);};
   openOv('det-in');
 }
@@ -1793,6 +1799,7 @@ function renderIn(){
             ${r.createdBy?`<div class="card-added-by">Added by ${esc(r.createdBy)}</div>`:''}
           </div>
           <div class="crow-right"><span class="badge ${IN_BDGE[ds]||''}">${ds}</span></div>
+          <button class="card-coworker-btn" onclick="event.stopPropagation();openCoworkerPopup('in','${r._k}')" title="Text a coworker">👥</button>
           <div class="chev">›</div>
         </div>
       </div>`;}).join('');
@@ -1876,8 +1883,11 @@ function openDetOL(key){
         <div><div class="dlbl">Added By</div><div class="dval">${esc(r.who||'—')}</div></div>
         ${r.notes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(r.notes)}</div></div>`:''}
       </div>
+    </div>
+    <div class="dsec"><div class="dsec-title">Notify</div>
+      <div class="notify-row"><button class="sbtn-ghost" onclick="openCoworkerPopup('ol','${key}')">👥 Text Coworker</button></div>
     </div>`;
-  document.getElementById('det-ol-del').onclick=()=>{if(confirm('Remove this item?')){R.ol.child(key).remove();closeAll();}};
+  document.getElementById('det-ol-del').onclick=()=>requireAdminDelete('Remove this item? This cannot be undone.',()=>{R.ol.child(key).remove();closeAll();});
   document.getElementById('det-ol-edit').onclick=()=>{closeAll();openOLForm(key);};
   openOv('det-ol');
 }
@@ -1903,6 +1913,7 @@ function renderOL(){
               ? `<span class="badge b-received">${r.qtyOrdered?'Ordered: '+esc(r.qtyOrdered):'Ordered'}</span>`
               : `<span style="font-size:.88rem;color:${URG_COL[r.urgency]};font-weight:700">${URG_ICO[r.urgency]||''} ${esc(r.urgency||'')}</span>`}
           </div>
+          <button class="card-coworker-btn" onclick="event.stopPropagation();openCoworkerPopup('ol','${r._k}')" title="Text a coworker">👥</button>
           <div class="chev">›</div>
         </div>
       </div>`).join('');
@@ -1977,12 +1988,15 @@ function openDetTask(key){
         ${r.createdBy?`<div><div class="dlbl">Added By</div><div class="dval">${esc(r.createdBy)}</div></div>`:''}
         ${r.notes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(r.notes)}</div></div>`:''}
       </div>
+    </div>
+    <div class="dsec"><div class="dsec-title">Notify</div>
+      <div class="notify-row"><button class="sbtn-ghost" onclick="openCoworkerPopup('task','${key}')">👥 Text Coworker</button></div>
     </div>`;
   const toggleBtn = document.getElementById('det-task-toggle');
   toggleBtn.textContent = r.done ? 'Mark Open' : 'Mark Done';
   toggleBtn.style.background = r.done ? 'var(--amber)' : 'var(--green)';
   toggleBtn.onclick = ()=>toggleTaskDone(key);
-  document.getElementById('det-task-del').onclick = ()=>pwDelete(()=>{R.tasks.child(key).remove();closeAll();});
+  document.getElementById('det-task-del').onclick = ()=>requireAdminDelete('Delete this task? This cannot be undone.',()=>{R.tasks.child(key).remove();closeAll();});
   document.getElementById('det-task-edit').onclick = ()=>{closeAll();openTaskForm(key);};
   openOv('det-task');
 }
@@ -2012,6 +2026,7 @@ function renderTasks(){
           ${r.createdBy?`<div class="card-added-by">Added by ${esc(r.createdBy)}</div>`:''}
         </div>
         <div class="crow-right"><span class="badge ${badgeCls}">${badgeTxt}</span></div>
+        <button class="card-coworker-btn" onclick="event.stopPropagation();openCoworkerPopup('task','${r._k}')" title="Text a coworker">👥</button>
         <div class="chev">›</div>
       </div>
     </div>`;
@@ -2052,23 +2067,12 @@ function saveHours(){
   R.hours.set(cfg); alert('Hours saved!');
 }
 
-// ── PASSWORD ──────────────────────────────────────────────────────────────────
-let _pwCb=null;
-const PW='8704494255';
-function pwDelete(cb){
-  _pwCb=cb;
-  document.getElementById('pw-inp').value='';
-  const e=document.getElementById('pw-err'); if(e)e.style.display='none';
-  openOv('pw-overlay');
-  setTimeout(()=>{ const el=document.getElementById('pw-inp'); if(el)el.focus(); },150);
-}
-function submitPW(){
-  if(document.getElementById('pw-inp').value===PW){
-    const cb=_pwCb; _pwCb=null; closeAll(); if(cb)cb();
-  } else {
-    const e=document.getElementById('pw-err'); if(e)e.style.display='block';
-    document.getElementById('pw-inp').value='';
-  }
+// ── ADMIN-GATED DELETE (same accounts as the Saw Shop app) ────────────────────
+const ADMIN_EMAILS = ['mike_millerhardware@outlook.com','jake@millersawshop.local','michael@millersawshop.local'];
+function isAdmin(){ return !!(CURRENT_USER && CURRENT_USER.email && ADMIN_EMAILS.indexOf(CURRENT_USER.email.toLowerCase())>=0); }
+function requireAdminDelete(msg, fn){
+  if(!isAdmin()){ alert("Only an administrator can delete this.\n\nAsk Michael to sign in on his account to do it."); return; }
+  if(confirm(msg)){ fn(); }
 }
 
 // ── EXPORT ────────────────────────────────────────────────────────────────────
