@@ -114,6 +114,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 .b-task-overdue{background:#FDECEC;color:var(--red)}
 .b-task-done{background:var(--green-bg);color:var(--green)}
 .b-spec{background:var(--purple-bg);color:var(--purple)}
+.b-attempted{background:#FDECEC;color:var(--red)}
 
 /* EMPTY STATE */
 .empty{padding:48px 20px;text-align:center;color:var(--g5);font-family:'Barlow Condensed',sans-serif;font-size:1rem;letter-spacing:1px}
@@ -173,6 +174,17 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 .chk-add-row{display:flex;gap:8px;margin-top:4px}
 .chk-inp{flex:1;font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none;background:var(--white)}
 .chk-inp:focus{border-color:var(--green)}
+
+/* ── TRUCK & EQUIPMENT CHECK ── */
+.truck-item{background:var(--white);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;margin-bottom:8px}
+.truck-item-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.truck-item-label{font-size:1rem;font-weight:600;color:var(--ink)}
+.truck-item-btns{display:flex;gap:6px;flex-shrink:0}
+.truck-btn{font-family:'Barlow Condensed',sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;border:1px solid var(--bd);background:var(--white);color:var(--g5);padding:7px 12px;border-radius:6px;cursor:pointer}
+.truck-btn.ok-active{background:var(--green);border-color:var(--green);color:#fff}
+.truck-btn.flag-active{background:var(--red);border-color:var(--red);color:#fff}
+.truck-item-issue{margin-top:8px;padding-top:8px;border-top:1px solid var(--g1);font-size:.85rem;color:var(--red)}
+.truck-item-issue img{max-width:120px;border-radius:6px;margin-top:6px;display:block;border:1px solid var(--bd);cursor:pointer}
 
 /* ── OVERLAY ── */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000;align-items:flex-end;justify-content:center;padding:0}
@@ -431,6 +443,13 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
     <input class="chk-inp" type="text" id="chk-inp" placeholder="Add a one-off task…" maxlength="100" onkeydown="if(event.key==='Enter')addChkItem()">
     <button class="btn btn-green" onclick="addChkItem()" style="padding:10px 16px;font-size:.9rem">Add</button>
   </div>
+
+  <div class="sec-hdr" style="margin-top:20px">
+    <span class="sec-title">🚚 Truck &amp; Equipment Check</span>
+    <span class="sec-line"></span>
+    <span id="truck-remaining" class="chk-count"></span>
+  </div>
+  <div id="truck-chk-list"></div>
 </div>
 
 <!-- DELIVERIES (Out + History merged) -->
@@ -515,6 +534,15 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
         <div id="recur-freq-detail" style="flex:1;min-width:140px;display:none"></div>
       </div>
       <button class="btn-save" onclick="addRecur()">Add Task</button>
+    </div>
+  </div>
+  <div class="sbox">
+    <div class="sbox-title">🚚 Truck &amp; Equipment Check Items</div>
+    <p style="font-size:.9rem;color:var(--g5);margin-bottom:14px">These show up on the dashboard every day for a quick truck check. Mark each OK, or flag it with a note and photo if something's wrong.</p>
+    <div id="truck-items-list"></div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <input type="text" id="truck-item-inp" placeholder="Item name…" style="flex:1;font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none" onkeydown="if(event.key==='Enter')addTruckItem()">
+      <button class="btn-save" onclick="addTruckItem()">Add</button>
     </div>
   </div>
   <div class="sbox">
@@ -614,6 +642,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
           <div class="fgrp"><label>Time Window</label><input type="text" id="o-window" placeholder="e.g. 8am – 11am"></div>
         </div>
         <div class="fgrp"><label>Driver</label><input type="text" id="o-driver" list="staff-datalist" placeholder="Who's running this?"></div>
+        <div class="fgrp"><label>Google Maps Pin (optional)</label><input type="url" id="o-maplink" placeholder="Paste a Google Maps link for the exact drop-off spot"></div>
         <div class="fgrp"><label>Notes</label><textarea id="o-notes" placeholder="Gate code, special instructions…"></textarea></div>
         <div class="fgrp">
           <label>Status</label>
@@ -726,6 +755,73 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
   </div>
 </div>
 
+<!-- COULDN'T DELIVER -->
+<div class="overlay" id="fail-modal" style="z-index:1600">
+  <div class="modal center" style="max-width:460px">
+    <div class="mhdr"><span class="mtitle">Couldn't Deliver</span><button class="mclose" onclick="closeAll()">×</button></div>
+    <div class="mbody">
+      <div class="fg">
+        <div class="fgrp">
+          <label>Reason</label>
+          <select id="fail-reason">
+            <option value="Nobody Home">Nobody Home</option>
+            <option value="Gate Locked / Blocked">Gate Locked / Blocked</option>
+            <option value="Couldn't Access Driveway">Couldn't Access Driveway</option>
+            <option value="Customer Refused">Customer Refused</option>
+            <option value="Weather">Weather</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="fgrp"><label>Notes</label><textarea id="fail-notes" placeholder="Anything else worth noting…"></textarea></div>
+        <div class="fdiv">Photo (optional)</div>
+        <div class="fgrp">
+          <div class="receipt-area" id="fail-photo-area">
+            <input type="file" accept="image/*" capture="environment" id="fail-photo-file" onchange="handleFailPhoto(event)">
+            <div class="receipt-lbl">
+              <span class="receipt-ico">📷</span>
+              <div class="receipt-txt">Tap to snap a photo</div>
+              <div class="receipt-sub">Locked gate, blocked driveway, etc.</div>
+            </div>
+          </div>
+          <div id="fail-photo-prev"></div>
+        </div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn-cancel" onclick="closeAll()">Cancel</button>
+      <button class="btn-save" style="background:var(--red)" onclick="saveFailedAttempt()">Save &amp; Reschedule</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRUCK ITEM: FLAG AN ISSUE -->
+<div class="overlay" id="truck-flag-modal" style="z-index:1600">
+  <div class="modal center" style="max-width:440px">
+    <div class="mhdr"><span class="mtitle">Flag an Issue: <span id="truck-flag-title"></span></span><button class="mclose" onclick="closeAll()">×</button></div>
+    <div class="mbody">
+      <div class="fg">
+        <div class="fgrp"><label>What's wrong?</label><textarea id="truck-flag-note" placeholder="e.g. front-left tire low, strap frayed…"></textarea></div>
+        <div class="fdiv">Photo (optional)</div>
+        <div class="fgrp">
+          <div class="receipt-area" id="truck-flag-photo-area">
+            <input type="file" accept="image/*" capture="environment" id="truck-flag-photo-file" onchange="handleTruckFlagPhoto(event)">
+            <div class="receipt-lbl">
+              <span class="receipt-ico">📷</span>
+              <div class="receipt-txt">Tap to snap a photo</div>
+              <div class="receipt-sub">Show the damage or issue</div>
+            </div>
+          </div>
+          <div id="truck-flag-photo-prev"></div>
+        </div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn-cancel" onclick="closeAll()">Cancel</button>
+      <button class="btn-save" style="background:var(--red)" onclick="saveTruckFlag()">Save Issue</button>
+    </div>
+  </div>
+</div>
+
 <!-- CALENDAR DAY POPUP -->
 <div class="overlay" id="cal-popup">
   <div class="modal center" style="max-width:420px;border-radius:8px;margin:auto">
@@ -782,7 +878,9 @@ const R = {
   chk:    db.ref('dlv3_chk'),
   recur:  db.ref('dlv3_recur'),
   hours:  db.ref('dlv3_hours'),
-  staff:  db.ref('dlv3_staff')
+  staff:  db.ref('dlv3_staff'),
+  truckItems: db.ref('dlv3_truckitems'),
+  truckChk:   db.ref('dlv3_truckchk')
 };
 
 // ── AUTH (shared staff login — same Firebase Auth user pool as the Saw Shop app) ─
@@ -830,7 +928,7 @@ AUTH.onAuthStateChanged(user=>{
 });
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let outRecs=[], inRecs=[], olRecs=[], taskRecs=[], chkRecs=[], recurTasks=[], staffList=[];
+let outRecs=[], inRecs=[], olRecs=[], taskRecs=[], chkRecs=[], recurTasks=[], staffList=[], truckItems=[], truckCheckToday={};
 let custs = {}; // shared customers, keyed by id
 let hoursConfig = {Mon:{o:'07:00',c:'17:00',x:false},Tue:{o:'07:00',c:'17:00',x:false},Wed:{o:'07:00',c:'17:00',x:false},Thu:{o:'07:00',c:'17:00',x:false},Fri:{o:'07:00',c:'17:00',x:false},Sat:{o:'08:00',c:'12:00',x:false},Sun:{o:'08:00',c:'12:00',x:true}};
 let editKey = {out:null, in:null, ol:null, task:null};
@@ -924,6 +1022,26 @@ function startDataSync(){
     const dl = document.getElementById('staff-datalist');
     if(dl) dl.innerHTML = staffList.map(st=>`<option value="${esc(st.name)}">`).join('');
   });
+  R.truckItems.on('value', s => {
+    truckItems = [];
+    s.forEach(c => { const v=c.val(); if(v) truckItems.push({_k:c.key,...v}); });
+    renderTruckItemsList();
+    renderTruckChk();
+  });
+  R.truckChk.child(TODAY()).on('value', s => {
+    truckCheckToday = s.val() || {};
+    renderTruckChk();
+  });
+  // seed default truck-check items once, outside the listener above (never write inside .on('value'))
+  setTimeout(()=>{
+    R.truckItems.once('value', s => {
+      if(!s.exists()){
+        ['Fuel Level','Tire Condition','Tie-Down Straps','Forklift Charge'].forEach(text=>{
+          R.truckItems.push({text, created:new Date().toISOString()});
+        });
+      }
+    });
+  }, 3000);
 }
 
 // ── OVERLAY ───────────────────────────────────────────────────────────────────
@@ -944,7 +1062,7 @@ function switchTab(id, btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('panel-'+id).classList.add('active');
-  if(id==='settings'){ renderHrsGrid(); renderRecurList(); renderStaffList(); renderInstallBox(); }
+  if(id==='settings'){ renderHrsGrid(); renderRecurList(); renderStaffList(); renderInstallBox(); renderTruckItemsList(); }
 }
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
@@ -1184,6 +1302,103 @@ setTimeout(()=>{
   });
 }, 5000);
 
+// ── TRUCK & EQUIPMENT CHECK ────────────────────────────────────────────────────
+function setTruckOk(itemKey){
+  const t = truckItems.find(x=>x._k===itemKey); if(!t) return;
+  R.truckChk.child(TODAY()).child('items').child(itemKey).set({text:t.text, ok:true});
+  R.truckChk.child(TODAY()).update({checkedBy:myDisplayName()||'Unknown', checkedAt:new Date().toISOString()});
+}
+
+let _truckFlagItemKey=null, tmpTruckFlagPhoto=null;
+function openTruckFlag(itemKey){
+  const t = truckItems.find(x=>x._k===itemKey); if(!t) return;
+  _truckFlagItemKey=itemKey; tmpTruckFlagPhoto=null;
+  document.getElementById('truck-flag-title').textContent = t.text;
+  const existing = (truckCheckToday.items||{})[itemKey];
+  document.getElementById('truck-flag-note').value = existing?.note || '';
+  const fi=document.getElementById('truck-flag-photo-file'); if(fi) fi.value='';
+  document.getElementById('truck-flag-photo-prev').innerHTML = existing?.photo
+    ? `<div class="receipt-prev"><img src="${existing.photo}" alt="issue"><button class="receipt-clear" onclick="clearTruckFlagPhoto()">✕</button></div>` : '';
+  if(existing?.photo) tmpTruckFlagPhoto = existing.photo;
+  openOv('truck-flag-modal');
+}
+function handleTruckFlagPhoto(e){
+  const file = e.target.files[0]; if(!file) return;
+  compress(file, data => {
+    tmpTruckFlagPhoto = data;
+    document.getElementById('truck-flag-photo-prev').innerHTML = `<div class="receipt-prev"><img src="${data}" alt="issue"><button class="receipt-clear" onclick="clearTruckFlagPhoto()">✕</button></div>`;
+  });
+  e.target.value = '';
+}
+function clearTruckFlagPhoto(){
+  tmpTruckFlagPhoto = null;
+  document.getElementById('truck-flag-photo-prev').innerHTML = '';
+  document.getElementById('truck-flag-photo-file').value = '';
+}
+function saveTruckFlag(){
+  const t = truckItems.find(x=>x._k===_truckFlagItemKey); if(!t) return;
+  const item = { text:t.text, ok:false, note:document.getElementById('truck-flag-note').value.trim() };
+  if(tmpTruckFlagPhoto) item.photo = tmpTruckFlagPhoto;
+  R.truckChk.child(TODAY()).child('items').child(_truckFlagItemKey).set(item);
+  R.truckChk.child(TODAY()).update({checkedBy:myDisplayName()||'Unknown', checkedAt:new Date().toISOString()});
+  closeAll();
+}
+
+function renderTruckChk(){
+  const wrap = document.getElementById('truck-chk-list'); if(!wrap) return;
+  const items = truckCheckToday.items||{};
+  if(!truckItems.length){
+    wrap.innerHTML = '<div style="color:var(--g5);font-size:.9rem;font-style:italic">No truck check items yet — add some in Settings.</div>';
+    const c=document.getElementById('truck-remaining'); if(c) c.textContent='';
+    return;
+  }
+  let doneCount = 0;
+  wrap.innerHTML = truckItems.map(t=>{
+    const state = items[t._k];
+    if(state) doneCount++;
+    const isOk = state?.ok;
+    const isFlagged = state && !state.ok;
+    return `<div class="truck-item">
+      <div class="truck-item-top">
+        <div class="truck-item-label">${esc(t.text)}</div>
+        <div class="truck-item-btns">
+          <button class="truck-btn${isOk?' ok-active':''}" onclick="setTruckOk('${t._k}')">✓ OK</button>
+          <button class="truck-btn${isFlagged?' flag-active':''}" onclick="openTruckFlag('${t._k}')">⚠ Flag</button>
+        </div>
+      </div>
+      ${isFlagged?`<div class="truck-item-issue">${esc(state.note||'Flagged — no note added')}${state.photo?`<img src="${state.photo}" onclick="document.getElementById('lb-img').src='${state.photo}';document.getElementById('lightbox').classList.add('open')" alt="issue photo">`:''}</div>`:''}
+    </div>`;
+  }).join('');
+  const c=document.getElementById('truck-remaining');
+  if(c){
+    const remaining = truckItems.length - doneCount;
+    c.textContent = remaining ? `${remaining} left` : 'All checked ✓';
+    c.className = 'chk-count' + (remaining ? '' : ' done');
+  }
+}
+
+function addTruckItem(){
+  const inp = document.getElementById('truck-item-inp');
+  const text = inp.value.trim();
+  if(!text) return;
+  if(truckItems.find(t=>t.text.toLowerCase()===text.toLowerCase())){ alert('Already in the list.'); return; }
+  R.truckItems.push({text, created:new Date().toISOString()});
+  inp.value = '';
+}
+function deleteTruckItem(key){ R.truckItems.child(key).remove(); }
+function renderTruckItemsList(){
+  const wrap = document.getElementById('truck-items-list'); if(!wrap) return;
+  if(!truckItems.length){
+    wrap.innerHTML = '<div style="font-size:.9rem;color:var(--g5);font-style:italic;margin-bottom:10px">No items yet.</div>';
+    return;
+  }
+  wrap.innerHTML = truckItems.map(t=>`
+    <div class="recur-row">
+      <span class="recur-name">${esc(t.text)}</span>
+      <button class="recur-del" onclick="deleteTruckItem('${t._k}')">✕ Remove</button>
+    </div>`).join('');
+}
+
 // ── RECURRING TASKS (Settings) ────────────────────────────────────────────────
 const WEEKDAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
@@ -1383,6 +1598,7 @@ function openOutForm(key){
   document.getElementById('o-date').value    = r?.date   ||TODAY();
   document.getElementById('o-window').value  = r?.window ||'';
   document.getElementById('o-driver').value  = r?.driver ||'';
+  document.getElementById('o-maplink').value = r?.mapLink||'';
   document.getElementById('o-notes').value   = r?.notes  ||'';
   document.getElementById('o-status').value  = r?.status ||'Scheduled';
   if(r?.receipt){
@@ -1400,6 +1616,7 @@ function saveOut(){
     date:document.getElementById('o-date').value,
     window:document.getElementById('o-window').value.trim(),
     driver:document.getElementById('o-driver').value.trim(),
+    mapLink:document.getElementById('o-maplink').value.trim(),
     notes:document.getElementById('o-notes').value.trim(),
     status:document.getElementById('o-status').value,
     receipt:tmpReceipt.o||'', receiptType:tmpReceipt.oType||'',
@@ -1434,7 +1651,17 @@ function openDetOut(key){
   const phone = custPhone(r.custId);
   document.getElementById('det-out-title').textContent=custName(r.custId);
   document.getElementById('det-out-body').innerHTML=`
-    <div class="dsec"><div class="dsec-title">Status</div><div class="status-row">${statusBtns}</div></div>
+    <div class="dsec"><div class="dsec-title">Status</div><div class="status-row">${statusBtns}</div>
+      ${r.status!=='Delivered'?`<div style="margin-top:8px"><button class="sbtn-danger" style="width:100%" onclick="openFailModal('${key}')">❌ Couldn't Deliver</button></div>`:''}
+    </div>
+    ${r.lastAttemptReason?`<div class="dsec"><div class="dsec-title">Delivery Attempts (${r.attemptCount||1})</div>
+      <div class="dgrid">
+        <div><div class="dlbl">Last Attempt</div><div class="dval" style="color:var(--red);font-weight:700">${esc(r.lastAttemptReason)}</div></div>
+        <div><div class="dlbl">When</div><div class="dval">${esc(r.lastAttemptAt||'—')}</div></div>
+        ${r.lastAttemptNotes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(r.lastAttemptNotes)}</div></div>`:''}
+      </div>
+      ${r.lastAttemptPhoto?`<img src="${r.lastAttemptPhoto}" style="max-width:100%;margin-top:8px;border:1px solid var(--bd);border-radius:6px;cursor:pointer" onclick="document.getElementById('lb-img').src='${r.lastAttemptPhoto}';document.getElementById('lightbox').classList.add('open')" alt="attempt photo">`:''}
+    </div>`:''}
     <div class="dsec"><div class="dsec-title">Customer</div>
       <div class="dgrid">
         <div><div class="dlbl">Name</div><div class="dval">${esc(custName(r.custId))}</div></div>
@@ -1444,6 +1671,7 @@ function openDetOut(key){
       <div class="notify-row">
         ${phone?`<button class="sbtn-ghost" onclick="textDeliveryCustomer('${key}')">💬 Text Customer</button>`:''}
         <button class="sbtn-ghost" onclick="openCoworkerPopup('out','${key}')">👥 Text Coworker</button>
+        ${r.mapLink?`<a href="${esc(r.mapLink)}" target="_blank" rel="noopener" class="sbtn-ghost" style="text-decoration:none;display:inline-block">📍 Open in Maps</a>`:''}
       </div>
     </div>
     <div class="dsec"><div class="dsec-title">Details</div>
@@ -1510,7 +1738,11 @@ function renderOut(){
             <div class="cmeta">${[custAddr(r.custId),fmtDate(r.date),r.window,r.driver?'Driver: '+r.driver:''].filter(Boolean).map(esc).join(' · ')}</div>
             ${r.createdBy?`<div class="card-added-by">Added by ${esc(r.createdBy)}</div>`:''}
           </div>
-          <div class="crow-right"><span class="badge ${OUT_BDGE[r.status]||''}">${r.status}</span></div>
+          <div class="crow-right">
+            <span class="badge ${OUT_BDGE[r.status]||''}">${r.status}</span>
+            ${(r.lastAttemptReason&&r.status!=='Delivered')?`<span class="badge b-attempted">⚠ Attempted</span>`:''}
+          </div>
+          ${r.mapLink?`<a href="${esc(r.mapLink)}" target="_blank" rel="noopener" class="card-coworker-btn" onclick="event.stopPropagation()" title="Open in Maps">📍</a>`:''}
           <button class="card-coworker-btn" onclick="event.stopPropagation();openCoworkerPopup('out','${r._k}')" title="Text a coworker">👥</button>
           <div class="chev">›</div>
         </div>
@@ -1570,6 +1802,49 @@ function saveSig(){
   const ts = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
   R.out.child(_sigKey).update({signature:data, signatureTs:ts});
   const key = _sigKey;
+  closeAll();
+  setTimeout(()=>openDetOut(key), 100);
+}
+
+// ── COULDN'T DELIVER (failed attempt) ─────────────────────────────────────────
+let _failKey = null, tmpFailPhoto = null;
+function openFailModal(key){
+  _failKey = key; tmpFailPhoto = null;
+  document.getElementById('fail-reason').value = 'Nobody Home';
+  document.getElementById('fail-notes').value = '';
+  const fi=document.getElementById('fail-photo-file'); if(fi) fi.value='';
+  const prev=document.getElementById('fail-photo-prev'); if(prev) prev.innerHTML='';
+  closeAll();
+  openOv('fail-modal');
+}
+function handleFailPhoto(e){
+  const file = e.target.files[0]; if(!file) return;
+  compress(file, data => {
+    tmpFailPhoto = data;
+    document.getElementById('fail-photo-prev').innerHTML = `<div class="receipt-prev"><img src="${data}" alt="issue photo"><button class="receipt-clear" onclick="clearFailPhoto()">✕</button></div>`;
+  });
+  e.target.value = '';
+}
+function clearFailPhoto(){
+  tmpFailPhoto = null;
+  document.getElementById('fail-photo-prev').innerHTML = '';
+  document.getElementById('fail-photo-file').value = '';
+}
+function saveFailedAttempt(){
+  if(!_failKey) return;
+  const existing = outRecs.find(x=>x._k===_failKey);
+  const ts = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+  const upd = {
+    status: 'Scheduled',
+    lastAttemptReason: document.getElementById('fail-reason').value,
+    lastAttemptNotes: document.getElementById('fail-notes').value.trim(),
+    lastAttemptAt: ts,
+    attemptCount: (existing?.attemptCount||0) + 1,
+    updated: new Date().toISOString()
+  };
+  if(tmpFailPhoto){ upd.lastAttemptPhoto = tmpFailPhoto; }
+  const key = _failKey;
+  R.out.child(key).update(upd);
   closeAll();
   setTimeout(()=>openDetOut(key), 100);
 }
@@ -2089,8 +2364,8 @@ function exportCSV(which){
   let rows='',name='';
   if(which==='out'){
     name=`miller-deliveries-${TODAY()}.csv`;
-    rows=csvRow(['Customer','Phone','Address','Date','Window','Driver','Status','Added By','Notes']);
-    outRecs.forEach(r=>rows+=csvRow([custName(r.custId),custPhone(r.custId),custAddr(r.custId),r.date||'',r.window||'',r.driver||'',r.status||'',r.createdBy||'',r.notes||'']));
+    rows=csvRow(['Customer','Phone','Address','Map Link','Date','Window','Driver','Status','Added By','Last Attempt','Notes']);
+    outRecs.forEach(r=>rows+=csvRow([custName(r.custId),custPhone(r.custId),custAddr(r.custId),r.mapLink||'',r.date||'',r.window||'',r.driver||'',r.status||'',r.createdBy||'',r.lastAttemptReason||'',r.notes||'']));
   } else if(which==='in'){
     name=`miller-inbound-${TODAY()}.csv`;
     rows=csvRow(['Vendor','PO','Items','Expected','Status','Special Order For','Received By','Added By','Notes']);
