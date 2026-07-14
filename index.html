@@ -95,6 +95,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 .crow-body{flex:1;min-width:0}
 .cname{font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmeta{font-size:.82rem;color:var(--g5);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-added-by{font-size:.72rem;color:var(--g3);margin-top:2px;font-style:italic}
 .crow-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
 .chev{color:var(--g3);font-size:1.1rem;margin-left:2px;flex-shrink:0}
 
@@ -659,10 +660,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
             <div id="in-cust-picker"></div>
           </div>
         </div>
-        <div class="fr">
-          <div class="fgrp"><label>Received By</label><input type="text" id="i-rcvby" list="staff-datalist" placeholder="Employee name"></div>
-          <div class="fgrp"><label>Received Date</label><input type="date" id="i-rcvdate"></div>
-        </div>
+        <div class="fgrp"><label>Received Date</label><input type="date" id="i-rcvdate"></div>
         <div class="fgrp"><label>Notes</label><textarea id="i-notes" placeholder="Short shipped, damaged cartons…"></textarea></div>
       </div>
     </div>
@@ -683,7 +681,6 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
             <select id="ol-urg"><option value="High">🔴 High — ASAP</option><option value="Medium" selected>🟡 Medium — Soon</option><option value="Low">🟢 Low — Next Order</option></select>
           </div>
         </div>
-        <div class="fgrp"><label>Added By</label><input type="text" id="ol-who" list="staff-datalist" placeholder="Your name"></div>
         <div class="fgrp"><label>Notes</label><textarea id="ol-notes" placeholder="Vendor, aisle, etc."></textarea></div>
       </div>
     </div>
@@ -1413,7 +1410,7 @@ function saveOut(){
     updated:new Date().toISOString()
   };
   if(editKey.out){ R.out.child(editKey.out).update(rec).catch(e=>console.error(e)); }
-  else{ rec.created=new Date().toISOString(); R.out.push(rec).catch(e=>console.error(e)); }
+  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; R.out.push(rec).catch(e=>console.error(e)); }
   closeAll();
 }
 
@@ -1455,6 +1452,7 @@ function openDetOut(key){
         <div><div class="dlbl">Date</div><div class="dval">${fmtDate(r.date)}</div></div>
         ${r.window?`<div><div class="dlbl">Time Window</div><div class="dval">${esc(r.window)}</div></div>`:''}
         ${r.driver?`<div><div class="dlbl">Driver</div><div class="dval">${esc(r.driver)}</div></div>`:''}
+        ${r.createdBy?`<div><div class="dlbl">Added By</div><div class="dval">${esc(r.createdBy)}</div></div>`:''}
         ${r.notes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(r.notes)}</div></div>`:''}
       </div>
     </div>
@@ -1511,6 +1509,7 @@ function renderOut(){
           <div class="crow-body">
             <div class="cname">${esc(custName(r.custId))}</div>
             <div class="cmeta">${[custAddr(r.custId),fmtDate(r.date),r.window,r.driver?'Driver: '+r.driver:''].filter(Boolean).map(esc).join(' · ')}</div>
+            ${r.createdBy?`<div class="card-added-by">Added by ${esc(r.createdBy)}</div>`:''}
           </div>
           <div class="crow-right"><span class="badge ${OUT_BDGE[r.status]||''}">${r.status}</span></div>
           <div class="chev">›</div>
@@ -1665,7 +1664,6 @@ function openInForm(key){
   document.getElementById('i-items').value   =r?.items   ||'';
   document.getElementById('i-exp').value     =r?.expected||'';
   document.getElementById('i-status').value  =r?.status  ||'Expected';
-  document.getElementById('i-rcvby').value   =r?.rcvby   ||'';
   document.getElementById('i-rcvdate').value =r?.rcvdate ||'';
   document.getElementById('i-notes').value   =r?.notes   ||'';
   document.getElementById('i-spec').checked  = !!r?.isSpecialOrder;
@@ -1682,18 +1680,18 @@ function saveIn(){
   if(status==='Expected'&&exp&&exp<TODAY()) status='Overdue';
   const isSpecialOrder = document.getElementById('i-spec').checked;
   const rec={vendor,po:document.getElementById('i-po').value.trim(),items:document.getElementById('i-items').value.trim(),
-    expected:exp,status,rcvby:document.getElementById('i-rcvby').value.trim(),
+    expected:exp,status,
     rcvdate:document.getElementById('i-rcvdate').value,notes:document.getElementById('i-notes').value.trim(),
     isSpecialOrder, custId: isSpecialOrder ? (custPickerState.in.custId||null) : null,
     updated:new Date().toISOString()};
   if(editKey.in){ R.in.child(editKey.in).update(rec).catch(e=>console.error(e)); }
-  else{ rec.created=new Date().toISOString(); R.in.push(rec).catch(e=>console.error(e)); }
+  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; R.in.push(rec).catch(e=>console.error(e)); }
   closeAll();
 }
 
 function setInStatus(key,status){
   const upd={status,updated:new Date().toISOString()};
-  if(status==='Received') upd.rcvdate=TODAY();
+  if(status==='Received'){ upd.rcvdate=TODAY(); upd.rcvby=myDisplayName()||'Unknown'; }
   R.in.child(key).update(upd);
   closeAll();
   const r = inRecs.find(x=>x._k===key);
@@ -1757,6 +1755,7 @@ function openDetIn(key){
         <div><div class="dlbl">Expected</div><div class="dval" style="${ovd?'color:var(--red);font-weight:700':''}">${fmtDate(r.expected)}${ovd?' ⚠️':''}</div></div>
         ${r.rcvdate?`<div><div class="dlbl">Received</div><div class="dval">${fmtDate(r.rcvdate)}</div></div>`:''}
         ${r.rcvby?`<div><div class="dlbl">Received By</div><div class="dval">${esc(r.rcvby)}</div></div>`:''}
+        ${r.createdBy?`<div><div class="dlbl">Added By</div><div class="dval">${esc(r.createdBy)}</div></div>`:''}
         ${r.notes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(r.notes)}</div></div>`:''}
       </div>
     </div>
@@ -1791,6 +1790,7 @@ function renderIn(){
           <div class="crow-body">
             <div class="cname">${esc(r.vendor||'—')}${r.isSpecialOrder?' <span class="badge b-spec" style="font-size:.62rem;vertical-align:middle">Special Order</span>':''}</div>
             <div class="cmeta">${[r.po?'PO: '+r.po:'',r.isSpecialOrder?'For: '+custName(r.custId):'',fmtDate(r.expected)].filter(Boolean).map(esc).join(' · ')}</div>
+            ${r.createdBy?`<div class="card-added-by">Added by ${esc(r.createdBy)}</div>`:''}
           </div>
           <div class="crow-right"><span class="badge ${IN_BDGE[ds]||''}">${ds}</span></div>
           <div class="chev">›</div>
@@ -1817,7 +1817,6 @@ function openOLForm(key){
   document.getElementById('ol-item').value =r?.item   ||'';
   document.getElementById('ol-qty').value  =r?.qty    ||'';
   document.getElementById('ol-urg').value  =r?.urgency||'Medium';
-  document.getElementById('ol-who').value  =r?.who    ||'';
   document.getElementById('ol-notes').value=r?.notes  ||'';
   openOv('form-ol');
 }
@@ -1827,10 +1826,10 @@ function saveOL(){
   if(!item){alert('Item name is required.');return;}
   const existing=editKey.ol?olRecs.find(x=>x._k===editKey.ol):null;
   const rec={item,qty:document.getElementById('ol-qty').value.trim(),urgency:document.getElementById('ol-urg').value,
-    who:document.getElementById('ol-who').value.trim(),notes:document.getElementById('ol-notes').value.trim(),
+    notes:document.getElementById('ol-notes').value.trim(),
     ordered:existing?.ordered||false,qtyOrdered:existing?.qtyOrdered||'',updated:new Date().toISOString()};
   if(editKey.ol){ R.ol.child(editKey.ol).update(rec).catch(e=>console.error(e)); }
-  else{ rec.created=new Date().toISOString(); R.ol.push(rec).catch(e=>console.error(e)); }
+  else{ rec.created=new Date().toISOString(); rec.who=myDisplayName()||'Unknown'; R.ol.push(rec).catch(e=>console.error(e)); }
   closeAll();
 }
 
@@ -1949,7 +1948,7 @@ function saveTask(){
     updated:    new Date().toISOString()
   };
   if(editKey.task){ R.tasks.child(editKey.task).update(rec).catch(e=>console.error(e)); }
-  else{ rec.created=new Date().toISOString(); R.tasks.push(rec).catch(e=>console.error(e)); }
+  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; R.tasks.push(rec).catch(e=>console.error(e)); }
   closeAll();
 }
 
@@ -1975,6 +1974,7 @@ function openDetTask(key){
         ${r.dueDate?`<div><div class="dlbl">Due Date</div><div class="dval" style="${st==='overdue'?'color:var(--red);font-weight:700':''}">${fmtDate(r.dueDate)}${st==='overdue'?' ⚠️':''}</div></div>`:''}
         ${r.priority?`<div><div class="dlbl">Priority</div><div class="dval">${TASK_URG_ICO[r.priority]||''} ${esc(r.priority)}</div></div>`:''}
         ${r.assignedTo?`<div><div class="dlbl">Assigned To</div><div class="dval">${esc(r.assignedTo)}</div></div>`:''}
+        ${r.createdBy?`<div><div class="dlbl">Added By</div><div class="dval">${esc(r.createdBy)}</div></div>`:''}
         ${r.notes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(r.notes)}</div></div>`:''}
       </div>
     </div>`;
@@ -2009,6 +2009,7 @@ function renderTasks(){
         <div class="crow-body">
           <div class="cname">${esc(r.title||'—')}</div>
           <div class="cmeta">${[r.dueDate?'Due: '+fmtDate(r.dueDate):'',r.assignedTo?'→ '+r.assignedTo:'',r.priority?TASK_URG_ICO[r.priority]+' '+r.priority:''].filter(Boolean).map(esc).join(' · ')}</div>
+          ${r.createdBy?`<div class="card-added-by">Added by ${esc(r.createdBy)}</div>`:''}
         </div>
         <div class="crow-right"><span class="badge ${badgeCls}">${badgeTxt}</span></div>
         <div class="chev">›</div>
@@ -2084,12 +2085,12 @@ function exportCSV(which){
   let rows='',name='';
   if(which==='out'){
     name=`miller-deliveries-${TODAY()}.csv`;
-    rows=csvRow(['Customer','Phone','Address','Date','Window','Driver','Status','Notes']);
-    outRecs.forEach(r=>rows+=csvRow([custName(r.custId),custPhone(r.custId),custAddr(r.custId),r.date||'',r.window||'',r.driver||'',r.status||'',r.notes||'']));
+    rows=csvRow(['Customer','Phone','Address','Date','Window','Driver','Status','Added By','Notes']);
+    outRecs.forEach(r=>rows+=csvRow([custName(r.custId),custPhone(r.custId),custAddr(r.custId),r.date||'',r.window||'',r.driver||'',r.status||'',r.createdBy||'',r.notes||'']));
   } else if(which==='in'){
     name=`miller-inbound-${TODAY()}.csv`;
-    rows=csvRow(['Vendor','PO','Items','Expected','Status','Special Order For','Received By','Notes']);
-    inRecs.forEach(r=>rows+=csvRow([r.vendor||'',r.po||'',r.items||'',r.expected||'',r.status||'',r.isSpecialOrder?custName(r.custId):'',r.rcvby||'',r.notes||'']));
+    rows=csvRow(['Vendor','PO','Items','Expected','Status','Special Order For','Received By','Added By','Notes']);
+    inRecs.forEach(r=>rows+=csvRow([r.vendor||'',r.po||'',r.items||'',r.expected||'',r.status||'',r.isSpecialOrder?custName(r.custId):'',r.rcvby||'',r.createdBy||'',r.notes||'']));
   } else if(which==='ol'){
     name=`miller-order-list-${TODAY()}.csv`;
     rows=csvRow(['Item','Qty on Hand','Urgency','Added By','Notes']);
