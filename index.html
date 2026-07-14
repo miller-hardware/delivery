@@ -410,6 +410,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
     <button class="tab" onclick="switchTab('out',this)">Deliveries <span class="pill" id="p-out">0</span></button>
     <button class="tab" onclick="switchTab('in',this)">Incoming <span class="pill" id="p-in">0</span></button>
     <button class="tab" onclick="switchTab('orders',this)">Order List <span class="pill" id="p-ol">0</span></button>
+    <button class="tab" onclick="switchTab('equipment',this)">Equipment <span class="pill" id="p-equip">0</span></button>
     <button class="tab" onclick="switchTab('tasks',this)">Tasks <span class="pill" id="p-tasks">0</span></button>
     <button class="tab" onclick="switchTab('settings',this)">Settings</button>
   </div>
@@ -443,13 +444,6 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
     <input class="chk-inp" type="text" id="chk-inp" placeholder="Add a one-off task…" maxlength="100" onkeydown="if(event.key==='Enter')addChkItem()">
     <button class="btn btn-green" onclick="addChkItem()" style="padding:10px 16px;font-size:.9rem">Add</button>
   </div>
-
-  <div class="sec-hdr" style="margin-top:20px">
-    <span class="sec-title">🚚 Truck &amp; Equipment Check</span>
-    <span class="sec-line"></span>
-    <span id="truck-remaining" class="chk-count"></span>
-  </div>
-  <div id="truck-chk-list"></div>
 </div>
 
 <!-- DELIVERIES (Out + History merged) -->
@@ -492,6 +486,18 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
   <div id="ol-meta" class="ol-meta"></div>
   <div class="card-list" id="ol-list"></div>
   <div id="ol-empty" class="empty" style="display:none"><span class="empty-ico">📋</span>Nothing on the order list.</div>
+</div>
+
+<!-- EQUIPMENT -->
+<div id="panel-equipment" class="panel">
+  <div class="bar">
+    <div class="bar-left">
+      <input class="srch" type="text" placeholder="Search equipment…" oninput="renderEquipList()" id="srch-equip">
+    </div>
+    <button class="btn btn-ink" onclick="openEquipForm()">+ Add Equipment</button>
+  </div>
+  <div class="card-list" id="equip-list"></div>
+  <div id="equip-empty" class="empty" style="display:none"><span class="empty-ico">🚚</span>No equipment yet — add a truck or forklift to get started.</div>
 </div>
 
 <!-- TASKS -->
@@ -537,12 +543,31 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
     </div>
   </div>
   <div class="sbox">
-    <div class="sbox-title">🚚 Truck &amp; Equipment Check Items</div>
-    <p style="font-size:.9rem;color:var(--g5);margin-bottom:14px">These show up on the dashboard every day for a quick truck check. Mark each OK, or flag it with a note and photo if something's wrong.</p>
-    <div id="truck-items-list"></div>
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <input type="text" id="truck-item-inp" placeholder="Item name…" style="flex:1;font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none" onkeydown="if(event.key==='Enter')addTruckItem()">
-      <button class="btn-save" onclick="addTruckItem()">Add</button>
+    <div class="sbox-title">🚚 Equipment</div>
+    <p style="font-size:.9rem;color:var(--g5);margin-bottom:14px">Trucks, forklifts, trailers — anything that needs regular checks. Each one gets its own check history and issue log in the Equipment tab.</p>
+    <div id="equip-settings-list"></div>
+    <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+      <input type="text" id="equip-name-inp" placeholder="Name (e.g. Truck 1)…" style="flex:1;min-width:140px;font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none">
+      <input type="text" id="equip-type-inp" list="equip-type-datalist" placeholder="Type (e.g. Truck, Forklift)…" style="flex:1;min-width:140px;font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none">
+      <button class="btn-save" onclick="addEquipment()">Add</button>
+    </div>
+  </div>
+  <div class="sbox">
+    <div class="sbox-title">☑ Types of Checks</div>
+    <p style="font-size:.9rem;color:var(--g5);margin-bottom:14px">Define what gets checked and how often. Leave "Applies To" blank to apply a check to every piece of equipment, or match it to a specific type (e.g. only Forklifts).</p>
+    <div id="checktype-list"></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+      <input type="text" id="checktype-inp" placeholder="Check name (e.g. Fuel Level)…" style="font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none;width:100%">
+      <input type="text" id="checktype-applies-inp" list="equip-type-datalist" placeholder="Applies to type (blank = all equipment)…" style="font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none;width:100%">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select id="checktype-freq" onchange="updateChecktypeFreqUI()" style="font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none;background:var(--white);flex:1;min-width:120px">
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+        <div id="checktype-freq-detail" style="flex:1;min-width:140px;display:none"></div>
+      </div>
+      <button class="btn-save" onclick="addChecktype()">Add Check</button>
     </div>
   </div>
   <div class="sbox">
@@ -795,29 +820,57 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 </div>
 
 <!-- TRUCK ITEM: FLAG AN ISSUE -->
-<div class="overlay" id="truck-flag-modal" style="z-index:1600">
+<div class="overlay" id="equip-flag-modal" style="z-index:1600">
   <div class="modal center" style="max-width:440px">
-    <div class="mhdr"><span class="mtitle">Flag an Issue: <span id="truck-flag-title"></span></span><button class="mclose" onclick="closeAll()">×</button></div>
+    <div class="mhdr"><span class="mtitle">Flag an Issue: <span id="equip-flag-title"></span></span><button class="mclose" onclick="closeAll()">×</button></div>
     <div class="mbody">
       <div class="fg">
-        <div class="fgrp"><label>What's wrong?</label><textarea id="truck-flag-note" placeholder="e.g. front-left tire low, strap frayed…"></textarea></div>
+        <div class="fgrp"><label>What's wrong?</label><textarea id="equip-flag-note" placeholder="e.g. front-left tire low, strap frayed…"></textarea></div>
         <div class="fdiv">Photo (optional)</div>
         <div class="fgrp">
-          <div class="receipt-area" id="truck-flag-photo-area">
-            <input type="file" accept="image/*" capture="environment" id="truck-flag-photo-file" onchange="handleTruckFlagPhoto(event)">
+          <div class="receipt-area" id="equip-flag-photo-area">
+            <input type="file" accept="image/*" capture="environment" id="equip-flag-photo-file" onchange="handleEquipFlagPhoto(event)">
             <div class="receipt-lbl">
               <span class="receipt-ico">📷</span>
               <div class="receipt-txt">Tap to snap a photo</div>
               <div class="receipt-sub">Show the damage or issue</div>
             </div>
           </div>
-          <div id="truck-flag-photo-prev"></div>
+          <div id="equip-flag-photo-prev"></div>
         </div>
       </div>
     </div>
     <div class="mfoot">
       <button class="btn-cancel" onclick="closeAll()">Cancel</button>
-      <button class="btn-save" style="background:var(--red)" onclick="saveTruckFlag()">Save Issue</button>
+      <button class="btn-save" style="background:var(--red)" onclick="saveEquipFlag()">Save Issue</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORM: EQUIPMENT -->
+<div class="overlay" id="form-equip">
+  <div class="modal">
+    <div class="mhdr"><span class="mtitle" id="form-equip-title">Add Equipment</span><button class="mclose" onclick="closeAll()">×</button></div>
+    <div class="mbody">
+      <div class="fg">
+        <div class="fgrp"><label>Name *</label><input type="text" id="eq-name" placeholder="e.g. Truck 1"></div>
+        <div class="fgrp"><label>Type</label><input type="text" id="eq-type" list="equip-type-datalist" placeholder="e.g. Truck, Forklift, Trailer"></div>
+        <div class="fgrp"><label>Notes</label><textarea id="eq-notes" placeholder="VIN, plate, anything worth noting…"></textarea></div>
+      </div>
+    </div>
+    <div class="mfoot"><button class="btn-cancel" onclick="closeAll()">Cancel</button><button class="btn-save" onclick="saveEquip()">Save Equipment</button></div>
+  </div>
+</div>
+
+<!-- DETAIL: EQUIPMENT -->
+<div class="overlay" id="det-equip">
+  <div class="modal">
+    <div class="mhdr"><span class="mtitle" id="det-equip-title">Equipment</span><button class="mclose" onclick="closeAll()">×</button></div>
+    <div class="mbody" id="det-equip-body"></div>
+    <div class="mfoot">
+      <button class="sbtn-danger" id="det-equip-del">Delete</button>
+      <button class="sbtn-ghost" id="det-equip-edit">Edit</button>
+      <button class="sbtn-done" onclick="closeAll()">Done</button>
     </div>
   </div>
 </div>
@@ -850,6 +903,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 <!-- Hidden inputs used by JS -->
 <input type="file" id="pod-photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePodPhoto(event)">
 <datalist id="staff-datalist"></datalist>
+<datalist id="equip-type-datalist"></datalist>
 
 <!-- PRINT AREA (Proof of Delivery) -->
 <div id="print-pod-area"></div>
@@ -879,8 +933,9 @@ const R = {
   recur:  db.ref('dlv3_recur'),
   hours:  db.ref('dlv3_hours'),
   staff:  db.ref('dlv3_staff'),
-  truckItems: db.ref('dlv3_truckitems'),
-  truckChk:   db.ref('dlv3_truckchk')
+  equipment:  db.ref('dlv3_equipment'),
+  checkTypes: db.ref('dlv3_checktypes'),
+  equipChecks: db.ref('dlv3_equipchecks')
 };
 
 // ── AUTH (shared staff login — same Firebase Auth user pool as the Saw Shop app) ─
@@ -928,10 +983,10 @@ AUTH.onAuthStateChanged(user=>{
 });
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let outRecs=[], inRecs=[], olRecs=[], taskRecs=[], chkRecs=[], recurTasks=[], staffList=[], truckItems=[], truckCheckToday={};
+let outRecs=[], inRecs=[], olRecs=[], taskRecs=[], chkRecs=[], recurTasks=[], staffList=[], equipList=[], checkTypes=[], equipChecks=[];
 let custs = {}; // shared customers, keyed by id
 let hoursConfig = {Mon:{o:'07:00',c:'17:00',x:false},Tue:{o:'07:00',c:'17:00',x:false},Wed:{o:'07:00',c:'17:00',x:false},Thu:{o:'07:00',c:'17:00',x:false},Fri:{o:'07:00',c:'17:00',x:false},Sat:{o:'08:00',c:'12:00',x:false},Sun:{o:'08:00',c:'12:00',x:true}};
-let editKey = {out:null, in:null, ol:null, task:null};
+let editKey = {out:null, in:null, ol:null, task:null, equip:null};
 let tmpReceipt = {o:null, oType:null};
 let showDelivered = false;
 const TODAY = ()=>new Date().toISOString().slice(0,10);
@@ -1022,26 +1077,24 @@ function startDataSync(){
     const dl = document.getElementById('staff-datalist');
     if(dl) dl.innerHTML = staffList.map(st=>`<option value="${esc(st.name)}">`).join('');
   });
-  R.truckItems.on('value', s => {
-    truckItems = [];
-    s.forEach(c => { const v=c.val(); if(v) truckItems.push({_k:c.key,...v}); });
-    renderTruckItemsList();
-    renderTruckChk();
+  R.equipment.on('value', s => {
+    equipList = [];
+    s.forEach(c => { const v=c.val(); if(v) equipList.push({_k:c.key,...v}); });
+    renderEquipSettingsList();
+    renderEquipTypeDatalist();
+    renderEquipList();
   });
-  R.truckChk.child(TODAY()).on('value', s => {
-    truckCheckToday = s.val() || {};
-    renderTruckChk();
+  R.checkTypes.on('value', s => {
+    checkTypes = [];
+    s.forEach(c => { const v=c.val(); if(v) checkTypes.push({_k:c.key,...v}); });
+    renderChecktypesList();
+    renderEquipList();
   });
-  // seed default truck-check items once, outside the listener above (never write inside .on('value'))
-  setTimeout(()=>{
-    R.truckItems.once('value', s => {
-      if(!s.exists()){
-        ['Fuel Level','Tire Condition','Tie-Down Straps','Forklift Charge'].forEach(text=>{
-          R.truckItems.push({text, created:new Date().toISOString()});
-        });
-      }
-    });
-  }, 3000);
+  R.equipChecks.on('value', s => {
+    equipChecks = [];
+    s.forEach(c => { const v=c.val(); if(v) equipChecks.push({_k:c.key,...v}); });
+    renderEquipList();
+  });
 }
 
 // ── OVERLAY ───────────────────────────────────────────────────────────────────
@@ -1051,7 +1104,7 @@ function openOv(id){
 }
 function closeAll(){
   document.querySelectorAll('.overlay').forEach(el=>el.classList.remove('open'));
-  editKey = {out:null, in:null, ol:null, task:null};
+  editKey = {out:null, in:null, ol:null, task:null, equip:null};
 }
 document.addEventListener('click', e=>{ if(e.target.classList.contains('overlay')) closeAll(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeAll(); });
@@ -1062,7 +1115,7 @@ function switchTab(id, btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('panel-'+id).classList.add('active');
-  if(id==='settings'){ renderHrsGrid(); renderRecurList(); renderStaffList(); renderInstallBox(); renderTruckItemsList(); }
+  if(id==='settings'){ renderHrsGrid(); renderRecurList(); renderStaffList(); renderInstallBox(); renderEquipSettingsList(); renderChecktypesList(); renderEquipTypeDatalist(); }
 }
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
@@ -1302,101 +1355,260 @@ setTimeout(()=>{
   });
 }, 5000);
 
-// ── TRUCK & EQUIPMENT CHECK ────────────────────────────────────────────────────
-function setTruckOk(itemKey){
-  const t = truckItems.find(x=>x._k===itemKey); if(!t) return;
-  R.truckChk.child(TODAY()).child('items').child(itemKey).set({text:t.text, ok:true});
-  R.truckChk.child(TODAY()).update({checkedBy:myDisplayName()||'Unknown', checkedAt:new Date().toISOString()});
+// ── EQUIPMENT (trucks, forklifts, etc.) ───────────────────────────────────────
+function periodSuffixFor(freq){
+  if(freq==='weekly') return 'w'+getWeekKey().replace(/-/g,'');
+  if(freq==='monthly') return 'm'+getMonthKey().replace(/-/g,'');
+  return 'd'+TODAY().replace(/-/g,'');
+}
+function equipCheckKey(equipId, checkTypeId, freq){
+  return 'e'+equipId.replace(/[^a-zA-Z0-9]/g,'')+'c'+checkTypeId.replace(/[^a-zA-Z0-9]/g,'')+periodSuffixFor(freq);
+}
+function checkTypesForEquip(equip){
+  return checkTypes.filter(ct => !ct.appliesToType || ct.appliesToType.toLowerCase()===((equip.type||'').toLowerCase()));
+}
+function findEquipCheck(equipId, checkTypeId, freq){
+  const key = equipCheckKey(equipId, checkTypeId, freq);
+  return equipChecks.find(x=>x._k===key);
 }
 
-let _truckFlagItemKey=null, tmpTruckFlagPhoto=null;
-function openTruckFlag(itemKey){
-  const t = truckItems.find(x=>x._k===itemKey); if(!t) return;
-  _truckFlagItemKey=itemKey; tmpTruckFlagPhoto=null;
-  document.getElementById('truck-flag-title').textContent = t.text;
-  const existing = (truckCheckToday.items||{})[itemKey];
-  document.getElementById('truck-flag-note').value = existing?.note || '';
-  const fi=document.getElementById('truck-flag-photo-file'); if(fi) fi.value='';
-  document.getElementById('truck-flag-photo-prev').innerHTML = existing?.photo
-    ? `<div class="receipt-prev"><img src="${existing.photo}" alt="issue"><button class="receipt-clear" onclick="clearTruckFlagPhoto()">✕</button></div>` : '';
-  if(existing?.photo) tmpTruckFlagPhoto = existing.photo;
-  openOv('truck-flag-modal');
+function setEquipCheckOk(equipId, checkTypeId){
+  const ct = checkTypes.find(x=>x._k===checkTypeId); if(!ct) return;
+  const key = equipCheckKey(equipId, checkTypeId, ct.freq||'daily');
+  R.equipChecks.child(key).set({equipId, checkTypeId, text:ct.text, ok:true, checkedBy:myDisplayName()||'Unknown', checkedAt:new Date().toISOString()});
 }
-function handleTruckFlagPhoto(e){
+
+let _eqFlagEquipId=null, _eqFlagCheckTypeId=null, tmpEquipFlagPhoto=null;
+function openEquipFlag(equipId, checkTypeId){
+  const ct = checkTypes.find(x=>x._k===checkTypeId); if(!ct) return;
+  _eqFlagEquipId=equipId; _eqFlagCheckTypeId=checkTypeId; tmpEquipFlagPhoto=null;
+  document.getElementById('equip-flag-title').textContent = ct.text;
+  const existing = findEquipCheck(equipId, checkTypeId, ct.freq||'daily');
+  document.getElementById('equip-flag-note').value = existing?.note || '';
+  const fi=document.getElementById('equip-flag-photo-file'); if(fi) fi.value='';
+  document.getElementById('equip-flag-photo-prev').innerHTML = existing?.photo
+    ? `<div class="receipt-prev"><img src="${existing.photo}" alt="issue"><button class="receipt-clear" onclick="clearEquipFlagPhoto()">✕</button></div>` : '';
+  tmpEquipFlagPhoto = existing?.photo || null;
+  openOv('equip-flag-modal');
+}
+function openLogIssue(equipId){
+  _eqFlagEquipId=equipId; _eqFlagCheckTypeId=null; tmpEquipFlagPhoto=null;
+  document.getElementById('equip-flag-title').textContent = 'General Issue';
+  document.getElementById('equip-flag-note').value = '';
+  const fi=document.getElementById('equip-flag-photo-file'); if(fi) fi.value='';
+  document.getElementById('equip-flag-photo-prev').innerHTML = '';
+  openOv('equip-flag-modal');
+}
+function handleEquipFlagPhoto(e){
   const file = e.target.files[0]; if(!file) return;
   compress(file, data => {
-    tmpTruckFlagPhoto = data;
-    document.getElementById('truck-flag-photo-prev').innerHTML = `<div class="receipt-prev"><img src="${data}" alt="issue"><button class="receipt-clear" onclick="clearTruckFlagPhoto()">✕</button></div>`;
+    tmpEquipFlagPhoto = data;
+    document.getElementById('equip-flag-photo-prev').innerHTML = `<div class="receipt-prev"><img src="${data}" alt="issue"><button class="receipt-clear" onclick="clearEquipFlagPhoto()">✕</button></div>`;
   });
   e.target.value = '';
 }
-function clearTruckFlagPhoto(){
-  tmpTruckFlagPhoto = null;
-  document.getElementById('truck-flag-photo-prev').innerHTML = '';
-  document.getElementById('truck-flag-photo-file').value = '';
+function clearEquipFlagPhoto(){
+  tmpEquipFlagPhoto = null;
+  document.getElementById('equip-flag-photo-prev').innerHTML = '';
+  document.getElementById('equip-flag-photo-file').value = '';
 }
-function saveTruckFlag(){
-  const t = truckItems.find(x=>x._k===_truckFlagItemKey); if(!t) return;
-  const item = { text:t.text, ok:false, note:document.getElementById('truck-flag-note').value.trim() };
-  if(tmpTruckFlagPhoto) item.photo = tmpTruckFlagPhoto;
-  R.truckChk.child(TODAY()).child('items').child(_truckFlagItemKey).set(item);
-  R.truckChk.child(TODAY()).update({checkedBy:myDisplayName()||'Unknown', checkedAt:new Date().toISOString()});
+function saveEquipFlag(){
+  const note = document.getElementById('equip-flag-note').value.trim();
+  const checkedBy = myDisplayName()||'Unknown';
+  const checkedAt = new Date().toISOString();
+  if(_eqFlagCheckTypeId){
+    const ct = checkTypes.find(x=>x._k===_eqFlagCheckTypeId); if(!ct) return;
+    const key = equipCheckKey(_eqFlagEquipId, _eqFlagCheckTypeId, ct.freq||'daily');
+    const item = {equipId:_eqFlagEquipId, checkTypeId:_eqFlagCheckTypeId, text:ct.text, ok:false, note, checkedBy, checkedAt};
+    if(tmpEquipFlagPhoto) item.photo = tmpEquipFlagPhoto;
+    R.equipChecks.child(key).set(item);
+  } else {
+    const item = {equipId:_eqFlagEquipId, checkTypeId:null, text:'General Issue', ok:false, note, checkedBy, checkedAt};
+    if(tmpEquipFlagPhoto) item.photo = tmpEquipFlagPhoto;
+    R.equipChecks.push(item);
+  }
+  const equipId = _eqFlagEquipId;
+  closeAll();
+  setTimeout(()=>openEquipDetail(equipId), 100);
+}
+
+function openEquipForm(key){
+  editKey.equip = key||null;
+  const eq = key ? equipList.find(x=>x._k===key) : null;
+  document.getElementById('form-equip-title').textContent = key?'Edit Equipment':'Add Equipment';
+  document.getElementById('eq-name').value = eq?.name||'';
+  document.getElementById('eq-type').value = eq?.type||'';
+  document.getElementById('eq-notes').value = eq?.notes||'';
+  openOv('form-equip');
+}
+function saveEquip(){
+  const name = document.getElementById('eq-name').value.trim();
+  if(!name){alert('Equipment name is required.');return;}
+  const rec = { name, type:document.getElementById('eq-type').value.trim(), notes:document.getElementById('eq-notes').value.trim(), updated:new Date().toISOString() };
+  if(editKey.equip){ R.equipment.child(editKey.equip).update(rec).catch(e=>console.error(e)); }
+  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; R.equipment.push(rec).catch(e=>console.error(e)); }
   closeAll();
 }
 
-function renderTruckChk(){
-  const wrap = document.getElementById('truck-chk-list'); if(!wrap) return;
-  const items = truckCheckToday.items||{};
-  if(!truckItems.length){
-    wrap.innerHTML = '<div style="color:var(--g5);font-size:.9rem;font-style:italic">No truck check items yet — add some in Settings.</div>';
-    const c=document.getElementById('truck-remaining'); if(c) c.textContent='';
-    return;
-  }
-  let doneCount = 0;
-  wrap.innerHTML = truckItems.map(t=>{
-    const state = items[t._k];
-    if(state) doneCount++;
-    const isOk = state?.ok;
-    const isFlagged = state && !state.ok;
+function openEquipDetail(equipId){
+  const eq = equipList.find(x=>x._k===equipId); if(!eq) return;
+  const applicable = checkTypesForEquip(eq);
+  const checksHtml = applicable.length ? applicable.map(ct=>{
+    const rec = findEquipCheck(equipId, ct._k, ct.freq||'daily');
+    const isOk = rec?.ok;
+    const isFlagged = rec && !rec.ok;
     return `<div class="truck-item">
       <div class="truck-item-top">
-        <div class="truck-item-label">${esc(t.text)}</div>
+        <div class="truck-item-label">${esc(ct.text)} <span class="recur-freq-badge">${esc(recurFreqLabel(ct))}</span></div>
         <div class="truck-item-btns">
-          <button class="truck-btn${isOk?' ok-active':''}" onclick="setTruckOk('${t._k}')">✓ OK</button>
-          <button class="truck-btn${isFlagged?' flag-active':''}" onclick="openTruckFlag('${t._k}')">⚠ Flag</button>
+          <button class="truck-btn${isOk?' ok-active':''}" onclick="setEquipCheckOk('${equipId}','${ct._k}')">✓ OK</button>
+          <button class="truck-btn${isFlagged?' flag-active':''}" onclick="openEquipFlag('${equipId}','${ct._k}')">⚠ Flag</button>
         </div>
       </div>
-      ${isFlagged?`<div class="truck-item-issue">${esc(state.note||'Flagged — no note added')}${state.photo?`<img src="${state.photo}" onclick="document.getElementById('lb-img').src='${state.photo}';document.getElementById('lightbox').classList.add('open')" alt="issue photo">`:''}</div>`:''}
+      ${isFlagged?`<div class="truck-item-issue">${esc(rec.note||'Flagged — no note added')}${rec.photo?`<img src="${rec.photo}" onclick="document.getElementById('lb-img').src='${rec.photo}';document.getElementById('lightbox').classList.add('open')" alt="issue photo">`:''}</div>`:''}
     </div>`;
-  }).join('');
-  const c=document.getElementById('truck-remaining');
-  if(c){
-    const remaining = truckItems.length - doneCount;
-    c.textContent = remaining ? `${remaining} left` : 'All checked ✓';
-    c.className = 'chk-count' + (remaining ? '' : ' done');
-  }
+  }).join('') : '<div style="font-size:.9rem;color:var(--g5);font-style:italic">No check types apply to this equipment yet — add some in Settings.</div>';
+
+  const history = equipChecks.filter(x=>x.equipId===equipId && x.ok===false).sort((a,b)=> (b.checkedAt||'') > (a.checkedAt||'') ? 1 : -1).slice(0,15);
+  const historyHtml = history.length ? history.map(h=>`
+    <div style="background:var(--g0);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div style="font-weight:700;color:var(--ink)">${esc(h.text||'Issue')}</div>
+      <div style="font-size:.9rem;color:var(--red)">${esc(h.note||'No note')}</div>
+      <div style="font-size:.75rem;color:var(--g5);margin-top:2px">${esc(h.checkedBy||'')} · ${esc(h.checkedAt?new Date(h.checkedAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'')}</div>
+      ${h.photo?`<img src="${h.photo}" style="max-width:120px;border-radius:6px;margin-top:6px;display:block;border:1px solid var(--bd);cursor:pointer" onclick="document.getElementById('lb-img').src='${h.photo}';document.getElementById('lightbox').classList.add('open')" alt="issue photo">`:''}
+    </div>`).join('') : '<div style="font-size:.9rem;color:var(--g5);font-style:italic">No issues logged.</div>';
+
+  document.getElementById('det-equip-title').textContent = eq.name;
+  document.getElementById('det-equip-body').innerHTML = `
+    <div class="dsec"><div class="dsec-title">Info</div>
+      <div class="dgrid">
+        <div><div class="dlbl">Name</div><div class="dval">${esc(eq.name)}</div></div>
+        <div><div class="dlbl">Type</div><div class="dval">${esc(eq.type||'—')}</div></div>
+        ${eq.notes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(eq.notes)}</div></div>`:''}
+      </div>
+    </div>
+    <div class="dsec"><div class="dsec-title">Checks</div>${checksHtml}</div>
+    <div class="dsec"><div class="dsec-title">Issue Log</div>
+      <button class="sbtn-ghost" style="margin-bottom:10px" onclick="openLogIssue('${equipId}')">+ Log an Issue</button>
+      ${historyHtml}
+    </div>`;
+  document.getElementById('det-equip-del').onclick=()=>requireAdminDelete('Delete this equipment? Its check history stays but will no longer be viewable. This cannot be undone.',()=>{R.equipment.child(equipId).remove();closeAll();});
+  document.getElementById('det-equip-edit').onclick=()=>{closeAll();openEquipForm(equipId);};
+  openOv('det-equip');
 }
 
-function addTruckItem(){
-  const inp = document.getElementById('truck-item-inp');
+function renderEquipList(){
+  const srch = (document.getElementById('srch-equip')?.value||'').toLowerCase();
+  const rows = equipList.filter(eq=>!srch||`${eq.name} ${eq.type||''}`.toLowerCase().includes(srch));
+  const wrap = document.getElementById('equip-list');
+  const empty = document.getElementById('equip-empty');
+  if(!wrap) return;
+  if(!rows.length){ wrap.innerHTML=''; if(empty) empty.style.display='block'; }
+  else {
+    if(empty) empty.style.display='none';
+    wrap.innerHTML = rows.map(eq=>{
+      const applicable = checkTypesForEquip(eq);
+      const openIssues = applicable.filter(ct=>{
+        const rec = findEquipCheck(eq._k, ct._k, ct.freq||'daily');
+        return rec && !rec.ok;
+      }).length;
+      return `<div class="card${openIssues?' s-task-overdue':''}" onclick="openEquipDetail('${eq._k}')">
+        <div class="crow">
+          <div class="crow-body">
+            <div class="cname">${esc(eq.name)}</div>
+            <div class="cmeta">${esc(eq.type||'—')}</div>
+          </div>
+          <div class="crow-right">${openIssues?`<span class="badge b-attempted">⚠ ${openIssues} Flagged</span>`:`<span class="badge b-received">✓ OK</span>`}</div>
+          <div class="chev">›</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  const totalOpen = equipList.reduce((sum,eq)=>{
+    const applicable = checkTypesForEquip(eq);
+    return sum + applicable.filter(ct=>{
+      const rec = findEquipCheck(eq._k, ct._k, ct.freq||'daily');
+      return rec && !rec.ok;
+    }).length;
+  },0);
+  const p=document.getElementById('p-equip'); if(p) p.textContent = totalOpen||0;
+}
+
+// ── CHECK TYPES (Settings) ─────────────────────────────────────────────────────
+function updateChecktypeFreqUI(){
+  const freq = document.getElementById('checktype-freq')?.value;
+  const detail = document.getElementById('checktype-freq-detail');
+  if(!detail) return;
+  if(freq==='weekly'){
+    detail.style.display='block';
+    detail.innerHTML=`<select id="checktype-weekday" style="font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none;background:var(--white);width:100%">
+      ${WEEKDAY_NAMES.map((n,i)=>`<option value="${i}">${n}</option>`).join('')}
+    </select>`;
+  } else if(freq==='monthly'){
+    detail.style.display='block';
+    const opts = Array.from({length:31},(_,i)=>`<option value="${i+1}">Day ${i+1}</option>`).join('');
+    detail.innerHTML=`<select id="checktype-monthday" style="font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;outline:none;background:var(--white);width:100%">${opts}</select>`;
+  } else {
+    detail.style.display='none';
+    detail.innerHTML='';
+  }
+}
+function addChecktype(){
+  const inp = document.getElementById('checktype-inp');
   const text = inp.value.trim();
   if(!text) return;
-  if(truckItems.find(t=>t.text.toLowerCase()===text.toLowerCase())){ alert('Already in the list.'); return; }
-  R.truckItems.push({text, created:new Date().toISOString()});
-  inp.value = '';
+  const freq = document.getElementById('checktype-freq')?.value || 'daily';
+  const rec = { text, freq, appliesToType: document.getElementById('checktype-applies-inp').value.trim(), created:new Date().toISOString() };
+  if(freq==='weekly'){ rec.weekday = parseInt(document.getElementById('checktype-weekday')?.value??'1'); }
+  else if(freq==='monthly'){ rec.monthDay = parseInt(document.getElementById('checktype-monthday')?.value??'1'); }
+  R.checkTypes.push(rec);
+  inp.value=''; document.getElementById('checktype-applies-inp').value='';
+  document.getElementById('checktype-freq').value='daily';
+  updateChecktypeFreqUI();
 }
-function deleteTruckItem(key){ R.truckItems.child(key).remove(); }
-function renderTruckItemsList(){
-  const wrap = document.getElementById('truck-items-list'); if(!wrap) return;
-  if(!truckItems.length){
-    wrap.innerHTML = '<div style="font-size:.9rem;color:var(--g5);font-style:italic;margin-bottom:10px">No items yet.</div>';
+function deleteChecktype(key){ R.checkTypes.child(key).remove(); }
+function renderChecktypesList(){
+  const wrap = document.getElementById('checktype-list'); if(!wrap) return;
+  if(!checkTypes.length){
+    wrap.innerHTML = '<div style="font-size:.9rem;color:var(--g5);font-style:italic;margin-bottom:10px">No check types yet.</div>';
     return;
   }
-  wrap.innerHTML = truckItems.map(t=>`
+  wrap.innerHTML = checkTypes.map(ct=>`
     <div class="recur-row">
-      <span class="recur-name">${esc(t.text)}</span>
-      <button class="recur-del" onclick="deleteTruckItem('${t._k}')">✕ Remove</button>
+      <span class="recur-name">${esc(ct.text)}${ct.appliesToType?` <span style="color:var(--g5);font-weight:400">(${esc(ct.appliesToType)})</span>`:''}</span>
+      <span class="recur-freq-badge">${esc(recurFreqLabel(ct))}</span>
+      <button class="recur-del" onclick="deleteChecktype('${ct._k}')">✕ Remove</button>
     </div>`).join('');
+}
+
+// ── EQUIPMENT LIST (Settings management) ──────────────────────────────────────
+function addEquipment(){
+  const nameInp = document.getElementById('equip-name-inp');
+  const typeInp = document.getElementById('equip-type-inp');
+  const name = nameInp.value.trim();
+  if(!name){alert('Enter an equipment name.');return;}
+  R.equipment.push({name, type:typeInp.value.trim(), notes:'', created:new Date().toISOString(), createdBy:myDisplayName()||'Unknown'});
+  nameInp.value=''; typeInp.value='';
+}
+function deleteEquipmentSetting(key){
+  requireAdminDelete('Delete this equipment? Its check history stays but will no longer be viewable. This cannot be undone.',()=>R.equipment.child(key).remove());
+}
+function renderEquipSettingsList(){
+  const wrap = document.getElementById('equip-settings-list'); if(!wrap) return;
+  if(!equipList.length){
+    wrap.innerHTML = '<div style="font-size:.9rem;color:var(--g5);font-style:italic;margin-bottom:10px">No equipment yet.</div>';
+    return;
+  }
+  wrap.innerHTML = equipList.map(eq=>`
+    <div class="recur-row">
+      <span class="recur-name">${esc(eq.name)}${eq.type?` <span style="color:var(--g5);font-weight:400">(${esc(eq.type)})</span>`:''}</span>
+      <button class="recur-del" onclick="deleteEquipmentSetting('${eq._k}')">✕ Remove</button>
+    </div>`).join('');
+}
+function renderEquipTypeDatalist(){
+  const dl = document.getElementById('equip-type-datalist'); if(!dl) return;
+  const types = [...new Set(equipList.map(eq=>eq.type).filter(Boolean))];
+  dl.innerHTML = types.map(t=>`<option value="${esc(t)}">`).join('');
 }
 
 // ── RECURRING TASKS (Settings) ────────────────────────────────────────────────
