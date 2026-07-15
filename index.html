@@ -667,7 +667,20 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
           <div class="fgrp"><label>Time Window</label><input type="text" id="o-window" placeholder="e.g. 8am – 11am"></div>
         </div>
         <div class="fgrp"><label>Driver</label><input type="text" id="o-driver" list="staff-datalist" placeholder="Who's running this?"></div>
-        <div class="fgrp"><label>Google Maps Pin (optional)</label><input type="url" id="o-maplink" placeholder="Paste a Google Maps link for the exact drop-off spot"></div>
+        <div class="fgrp">
+          <label class="fchk"><input type="checkbox" id="o-alt-addr-chk" onchange="toggleAltAddress()"> Deliver to a different address than the one on file</label>
+          <div id="o-alt-addr-wrap" style="display:none;margin-top:6px">
+            <input type="text" id="o-alt-address" placeholder="Street, City, ZIP for this delivery">
+          </div>
+        </div>
+        <div class="fgrp">
+          <label>Refine Location with a Pin (optional)</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button type="button" class="sbtn-ghost" onclick="dropPinHere()">📍 Drop a Pin (My Current Location)</button>
+            <span id="o-pin-status" style="font-size:.85rem;color:var(--g5)"></span>
+          </div>
+          <input type="url" id="o-maplink" placeholder="…or paste a Google Maps link manually" style="margin-top:6px">
+        </div>
         <div class="fgrp"><label>Notes</label><textarea id="o-notes" placeholder="Gate code, special instructions…"></textarea></div>
         <div class="fgrp">
           <label>Status</label>
@@ -996,6 +1009,7 @@ function fmtDate(d){if(!d)return'—';try{const[y,m,dy]=d.split('-');return['Jan
 function custName(id){ const c=custs[id]; if(!c) return '—'; return ((c.first||'')+' '+(c.last||'')).trim()||'—'; }
 function custPhone(id){ return (custs[id]||{}).phone||''; }
 function custAddr(id){ return (custs[id]||{}).addr||''; }
+function deliveryAddr(r){ return r.altAddress || custAddr(r.custId); }
 
 // ── SMS (free, manual — opens the user's own Messages app, they hit send) ────
 function sendSMS(phone, msg){
@@ -1811,6 +1825,10 @@ function openOutForm(key){
   document.getElementById('o-window').value  = r?.window ||'';
   document.getElementById('o-driver').value  = r?.driver ||'';
   document.getElementById('o-maplink').value = r?.mapLink||'';
+  document.getElementById('o-pin-status').textContent = '';
+  document.getElementById('o-alt-addr-chk').checked = !!r?.altAddress;
+  document.getElementById('o-alt-address').value = r?.altAddress||'';
+  document.getElementById('o-alt-addr-wrap').style.display = r?.altAddress ? 'block' : 'none';
   document.getElementById('o-notes').value   = r?.notes  ||'';
   document.getElementById('o-status').value  = r?.status ||'Scheduled';
   if(r?.receipt){
@@ -1820,14 +1838,35 @@ function openOutForm(key){
   openOv('form-out');
 }
 
+function toggleAltAddress(){
+  const on = document.getElementById('o-alt-addr-chk').checked;
+  document.getElementById('o-alt-addr-wrap').style.display = on ? 'block' : 'none';
+  if(!on) document.getElementById('o-alt-address').value = '';
+}
+
+function dropPinHere(){
+  const status = document.getElementById('o-pin-status');
+  if(!navigator.geolocation){ status.textContent = "Location isn't available on this device/browser."; return; }
+  status.textContent = 'Getting your location…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const {latitude,longitude} = pos.coords;
+    document.getElementById('o-maplink').value = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+    status.textContent = '✓ Pin dropped at your current location.';
+  }, err=>{
+    status.textContent = 'Could not get your location: '+err.message;
+  }, {enableHighAccuracy:true, timeout:10000});
+}
+
 function saveOut(){
   const custId = custPickerState.out.custId;
   if(!custId){alert('Please select or add a customer.');return;}
+  const useAltAddr = document.getElementById('o-alt-addr-chk').checked;
   const rec={
     custId,
     date:document.getElementById('o-date').value,
     window:document.getElementById('o-window').value.trim(),
     driver:document.getElementById('o-driver').value.trim(),
+    altAddress: useAltAddr ? document.getElementById('o-alt-address').value.trim() : '',
     mapLink:document.getElementById('o-maplink').value.trim(),
     notes:document.getElementById('o-notes').value.trim(),
     status:document.getElementById('o-status').value,
@@ -1878,7 +1917,7 @@ function openDetOut(key){
       <div class="dgrid">
         <div><div class="dlbl">Name</div><div class="dval">${esc(custName(r.custId))}</div></div>
         <div><div class="dlbl">Phone</div><div class="dval">${esc(phone||'—')}</div></div>
-        <div style="grid-column:1/-1"><div class="dlbl">Address</div><div class="dval">${esc(custAddr(r.custId)||'—')}</div></div>
+        <div style="grid-column:1/-1"><div class="dlbl">${r.altAddress?'Delivery Address (different from file)':'Address'}</div><div class="dval">${esc(deliveryAddr(r)||'—')}</div></div>
       </div>
       <div class="notify-row">
         ${phone?`<button class="sbtn-ghost" onclick="textDeliveryCustomer('${key}')">💬 Text Customer</button>`:''}
@@ -1933,7 +1972,7 @@ function renderOut(){
   const srch=(document.getElementById('srch-out')?.value||'').toLowerCase();
   const rows=outRecs.filter(r=>{
     if(!showDelivered && r.status==='Delivered') return false;
-    const hay = `${custName(r.custId)} ${custAddr(r.custId)}`.toLowerCase();
+    const hay = `${custName(r.custId)} ${deliveryAddr(r)}`.toLowerCase();
     return !srch||hay.includes(srch);
   });
   const wrap=document.getElementById('out-list');
@@ -1947,7 +1986,7 @@ function renderOut(){
         <div class="crow">
           <div class="crow-body">
             <div class="cname">${esc(custName(r.custId))}</div>
-            <div class="cmeta">${[custAddr(r.custId),fmtDate(r.date),r.window,r.driver?'Driver: '+r.driver:''].filter(Boolean).map(esc).join(' · ')}</div>
+            <div class="cmeta">${[deliveryAddr(r),fmtDate(r.date),r.window,r.driver?'Driver: '+r.driver:''].filter(Boolean).map(esc).join(' · ')}</div>
             ${r.createdBy?`<div class="card-added-by">Added by ${esc(r.createdBy)}</div>`:''}
           </div>
           <div class="crow-right">
@@ -2071,7 +2110,7 @@ function printPOD(key){
     <div class="pod-print-meta">
       <div><b>Customer:</b> ${esc(name)}</div>
       <div><b>Phone:</b> ${esc(custPhone(r.custId)||'—')}</div>
-      <div><b>Address:</b> ${esc(custAddr(r.custId)||'—')}</div>
+      <div><b>${r.altAddress?'Delivery Address (different from file)':'Address'}:</b> ${esc(deliveryAddr(r)||'—')}</div>
       <div><b>Delivery Date:</b> ${fmtDate(r.date)}</div>
       ${r.window?`<div><b>Window:</b> ${esc(r.window)}</div>`:''}
       ${r.driver?`<div><b>Driver:</b> ${esc(r.driver)}</div>`:''}
@@ -2577,7 +2616,7 @@ function exportCSV(which){
   if(which==='out'){
     name=`miller-deliveries-${TODAY()}.csv`;
     rows=csvRow(['Customer','Phone','Address','Map Link','Date','Window','Driver','Status','Added By','Last Attempt','Notes']);
-    outRecs.forEach(r=>rows+=csvRow([custName(r.custId),custPhone(r.custId),custAddr(r.custId),r.mapLink||'',r.date||'',r.window||'',r.driver||'',r.status||'',r.createdBy||'',r.lastAttemptReason||'',r.notes||'']));
+    outRecs.forEach(r=>rows+=csvRow([custName(r.custId),custPhone(r.custId),deliveryAddr(r),r.mapLink||'',r.date||'',r.window||'',r.driver||'',r.status||'',r.createdBy||'',r.lastAttemptReason||'',r.notes||'']));
   } else if(which==='in'){
     name=`miller-inbound-${TODAY()}.csv`;
     rows=csvRow(['Vendor','PO','Items','Expected','Status','Special Order For','Received By','Added By','Notes']);
