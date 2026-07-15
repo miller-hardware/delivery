@@ -360,22 +360,6 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 .account-signout{background:none;border:none;color:var(--g3);font-family:'Barlow Condensed',sans-serif;font-size:.75rem;letter-spacing:1px;text-transform:uppercase;cursor:pointer;padding:0;text-decoration:underline}
 .account-signout:hover{color:var(--white)}
 
-/* PRINT — Proof of Delivery */
-#print-pod-area{display:none}
-.pod-print-hdr{font-family:'Barlow Condensed',sans-serif;font-size:1.6rem;font-weight:800;letter-spacing:1px;border-bottom:3px solid #C0392B;padding-bottom:10px;margin-bottom:16px}
-.pod-print-hdr span{color:#C0392B}
-.pod-print-meta div{font-size:.95rem;margin-bottom:6px}
-.pod-print-sec{margin-top:18px}
-.pod-print-lbl{font-family:'Barlow Condensed',sans-serif;font-size:.8rem;letter-spacing:1.5px;text-transform:uppercase;color:#777;border-bottom:1px solid #ccc;padding-bottom:4px;margin-bottom:8px}
-.pod-print-sec img{max-width:100%;max-height:320px;display:block}
-.pod-print-sig{max-height:150px !important;border:1px solid #ccc}
-.pod-print-ts{font-size:.8rem;color:#777;margin-top:4px}
-.pod-print-foot{margin-top:24px;font-size:.75rem;color:#999}
-@media print{
-  body *{visibility:hidden}
-  #print-pod-area,#print-pod-area *{visibility:visible}
-  #print-pod-area{display:block;position:absolute;left:0;top:0;width:100%;padding:20px}
-}
 </style>
 </head>
 <body>
@@ -918,12 +902,10 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 <datalist id="staff-datalist"></datalist>
 <datalist id="equip-type-datalist"></datalist>
 
-<!-- PRINT AREA (Proof of Delivery) -->
-<div id="print-pod-area"></div>
-
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 firebase.initializeApp({
@@ -1953,7 +1935,7 @@ function openDetOut(key){
         </div>
         <button class="sbtn-ghost" onclick="openSigPad('${key}')">${r.signature?'Re-sign':'Capture'}</button>
       </div>
-      ${(r.deliveryPhoto||r.signature)?`<div style="margin-top:10px"><button class="btn btn-ink" style="width:100%" onclick="printPOD('${key}')">🖨 Print Proof of Delivery</button></div>`:''}
+      ${(r.deliveryPhoto||r.signature)?`<div style="margin-top:10px"><button class="btn btn-ink" style="width:100%" onclick="downloadPOD('${key}')">⬇ Download Proof of Delivery</button></div>`:''}
     </div>`;
   document.getElementById('det-out-del').onclick=()=>requireAdminDelete('Delete this delivery? This cannot be undone.',()=>{R.out.child(key).remove();closeAll();});
   document.getElementById('det-out-edit').onclick=()=>{closeAll();openOutForm(key);};
@@ -2100,27 +2082,76 @@ function saveFailedAttempt(){
   setTimeout(()=>openDetOut(key), 100);
 }
 
-// ── PRINT PROOF OF DELIVERY ────────────────────────────────────────────────────
-function printPOD(key){
+// ── DOWNLOAD PROOF OF DELIVERY (PDF) ──────────────────────────────────────────
+function loadImgDims(dataUrl){
+  return new Promise(resolve=>{
+    const img = new Image();
+    img.onload = ()=> resolve({w:img.naturalWidth, h:img.naturalHeight});
+    img.onerror = ()=> resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+async function downloadPOD(key){
   const r = outRecs.find(x=>x._k===key); if(!r) return;
+  if(!(window.jspdf && window.jspdf.jsPDF)){ alert('PDF tool is still loading — give it a second and tap Download again.'); return; }
+  const jsPDF = window.jspdf.jsPDF;
+  const doc = new jsPDF({unit:'pt', format:'letter'});
+  const M = 54, MAXW = 500;
+  let y = 58;
   const name = custName(r.custId);
-  const area = document.getElementById('print-pod-area');
-  area.innerHTML = `
-    <div class="pod-print-hdr">MILLER <span>HARDWARE</span> — Proof of Delivery</div>
-    <div class="pod-print-meta">
-      <div><b>Customer:</b> ${esc(name)}</div>
-      <div><b>Phone:</b> ${esc(custPhone(r.custId)||'—')}</div>
-      <div><b>${r.altAddress?'Delivery Address (different from file)':'Address'}:</b> ${esc(deliveryAddr(r)||'—')}</div>
-      <div><b>Delivery Date:</b> ${fmtDate(r.date)}</div>
-      ${r.window?`<div><b>Window:</b> ${esc(r.window)}</div>`:''}
-      ${r.driver?`<div><b>Driver:</b> ${esc(r.driver)}</div>`:''}
-      ${r.notes?`<div><b>Notes:</b> ${esc(r.notes)}</div>`:''}
-    </div>
-    ${r.deliveryPhoto?`<div class="pod-print-sec"><div class="pod-print-lbl">Delivery Photo</div><img src="${r.deliveryPhoto}"></div>`:''}
-    ${r.signature?`<div class="pod-print-sec"><div class="pod-print-lbl">Customer Signature</div><img src="${r.signature}" class="pod-print-sig"><div class="pod-print-ts">${esc(r.signatureTs||'')}</div></div>`:''}
-    <div class="pod-print-foot">Printed ${new Date().toLocaleString()}</div>
-  `;
-  window.print();
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('MILLER HARDWARE — PROOF OF DELIVERY', M, y);
+  y += 26;
+
+  doc.setFontSize(10);
+  const rows = [
+    ['Customer', name],
+    ['Phone', custPhone(r.custId)||'—'],
+    [r.altAddress?'Delivery Address (different from file)':'Address', deliveryAddr(r)||'—'],
+    ['Delivery Date', fmtDate(r.date)]
+  ];
+  if(r.window) rows.push(['Window', r.window]);
+  if(r.driver) rows.push(['Driver', r.driver]);
+  if(r.notes) rows.push(['Notes', r.notes]);
+  rows.forEach(([label,val])=>{
+    doc.setFont('helvetica','bold'); doc.text(label+':', M, y);
+    doc.setFont('helvetica','normal');
+    const lines = doc.splitTextToSize(String(val), MAXW-120);
+    doc.text(lines, M+120, y);
+    y += 14*lines.length;
+  });
+  y += 16;
+
+  if(r.deliveryPhoto){
+    const dims = await loadImgDims(r.deliveryPhoto);
+    if(dims && dims.w){
+      const w = Math.min(MAXW, dims.w);
+      const h = w * (dims.h/dims.w);
+      if(y+30+h > 730){ doc.addPage(); y=58; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0);
+      doc.text('Delivery Photo', M, y); y += 14;
+      doc.addImage(r.deliveryPhoto, 'JPEG', M, y, w, h);
+      y += h + 20;
+    }
+  }
+  if(r.signature){
+    const dims = await loadImgDims(r.signature);
+    if(dims && dims.w){
+      const w = Math.min(260, dims.w);
+      const h = w * (dims.h/dims.w);
+      if(y+40+h > 730){ doc.addPage(); y=58; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(0);
+      doc.text('Customer Signature', M, y); y += 14;
+      doc.addImage(r.signature, 'PNG', M, y, w, h);
+      y += h + 8;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(130);
+      doc.text(r.signatureTs||'', M, y);
+    }
+  }
+  const safeName = (name||'Delivery').replace(/[^a-zA-Z0-9]/g,'') || 'Delivery';
+  doc.save(`Miller-Delivery-${safeName}-${r.date||TODAY()}.pdf`);
 }
 
 // ── RECEIPT HANDLER ───────────────────────────────────────────────────────────
