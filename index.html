@@ -346,6 +346,30 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 .install-step-txt b{color:var(--red)}
 .install-btn-row{margin-top:4px}
 
+/* ── STAFF GUIDE ── */
+#guide-overlay{display:none;position:fixed;inset:0;z-index:4000;background:var(--g1);overflow-y:auto;font-family:'Barlow',sans-serif}
+.guide-hdr{position:sticky;top:0;background:var(--ink);color:var(--white);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;z-index:2}
+.guide-title{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:1.3rem;letter-spacing:1px}
+.guide-body{max-width:720px;margin:0 auto;padding:18px 16px 60px}
+.guide-intro{background:var(--ink);color:var(--white);border-radius:8px;padding:18px 20px;margin-bottom:16px}
+.guide-intro-title{font-size:1.1rem;font-weight:800;margin-bottom:6px}
+.guide-intro-body{font-size:.9rem;line-height:1.6;color:var(--g3)}
+.guide-sec{background:var(--white);border:1.5px solid var(--bd);border-radius:6px;margin-bottom:8px}
+.guide-sec summary{cursor:pointer;padding:12px 14px;font-weight:700;font-size:.98rem;color:var(--ink);font-family:'Barlow Condensed',sans-serif;letter-spacing:.5px}
+.guide-sec-body{padding:0 15px 14px;font-size:.9rem;line-height:1.6;color:var(--g7)}
+.guide-sec-body ul,.guide-sec-body ol{padding-left:20px;margin-top:6px}
+.guide-sec-body li{margin-bottom:6px}
+.guide-btn{background:none;border:1px solid rgba(255,255,255,.3);color:var(--g3);font-family:'Barlow',sans-serif;font-size:.78rem;font-weight:600;padding:5px 12px;border-radius:14px;cursor:pointer}
+.guide-btn:hover{color:var(--white);border-color:var(--white)}
+.guide-open-btn{background:none;border:1px solid rgba(255,255,255,.3);color:var(--g3);font-family:'Barlow',sans-serif;font-size:.75rem;font-weight:600;padding:4px 11px;border-radius:14px;cursor:pointer}
+.guide-open-btn:hover{color:var(--white);border-color:var(--white)}
+
+@media print{
+  body *{visibility:hidden}
+  #print-area,#print-area *{visibility:visible}
+  #print-area{display:block!important;position:absolute;left:0;top:0;width:100%;background:#fff}
+}
+
 /* ── LOGIN GATE ── */
 #login-screen{display:none;position:fixed;inset:0;z-index:5000;background:var(--ink);align-items:center;justify-content:center;padding:20px}
 .login-card{width:100%;max-width:340px;background:var(--white);border-radius:10px;padding:28px 24px;border-top:5px solid var(--red)}
@@ -380,6 +404,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
   <div class="hdr">
     <div class="logo">MILLER <span>HARDWARE</span></div>
     <div class="hdr-right">
+      <button class="guide-open-btn" onclick="openGuide()" title="Staff Guide">📖 Guide</button>
       <div class="sync"><div class="sdot conn" id="sdot"></div><span id="sync-txt">Connecting…</span></div>
       <div class="account-strip" id="account-strip" style="display:none"><span class="account-name" id="account-name"></span><button class="account-signout" onclick="doLogout()">Sign Out</button></div>
       <span class="loc-badge">Yellville</span>
@@ -901,6 +926,19 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 <input type="file" id="pod-photo-input" accept="image/*" capture="environment" style="display:none" onchange="handlePodPhoto(event)">
 <datalist id="staff-datalist"></datalist>
 <datalist id="equip-type-datalist"></datalist>
+
+<!-- STAFF GUIDE -->
+<div id="guide-overlay">
+  <div class="guide-hdr">
+    <div class="guide-title">📖 Staff Guide</div>
+    <div style="display:flex;gap:8px">
+      <button class="guide-btn" onclick="printGuide()">Print</button>
+      <button class="guide-btn" onclick="closeGuide()">Close</button>
+    </div>
+  </div>
+  <div id="guide-body" class="guide-body"></div>
+</div>
+<div id="print-area" style="display:none"></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
@@ -2740,6 +2778,53 @@ function renderInstallBox(){
   el.innerHTML = `<p style="font-size:.9rem;color:var(--g5)">Open this page in Chrome on your phone, then look for <b>Install app</b> or <b>Add to Home Screen</b> in the browser menu (⋮).</p>`;
 }
 buildAppIcons();
+
+// ── STAFF GUIDE ────────────────────────────────────────────────────────────────
+function guideSections(){return [
+['1. Signing In',
+ "<p>Open the app on your phone or the shop tablet. Type your <strong>first name</strong> and your <strong>password</strong>, then tap <strong>Sign In</strong>. Your phone remembers you afterward, so you'll only need to do this once per device.</p><p>This same login works in the <strong>Saw Shop app</strong> too — one account, both apps.</p><p>Signing in for the first time? Accounts aren't self-service — ask Michael to set yours up.</p>"],
+['2. The Tabs, at a Glance',
+ "<ul><li><strong>Dashboard</strong> — calendar, today's stats, and your daily checklist.</li><li><strong>Deliveries</strong> — everything going out; tap + New to schedule one.</li><li><strong>Incoming</strong> — shipments coming in from vendors, including special orders for customers.</li><li><strong>Order List</strong> — yard items running low. No UPCs here — that's the POS's job.</li><li><strong>Equipment</strong> — trucks, forklifts, trailers — daily/weekly/monthly checks and an issue log for each one.</li><li><strong>Tasks</strong> — anything with a due date that isn't a delivery or a shipment.</li><li><strong>Settings</strong> — recurring checklist tasks, equipment check types, staff for texting, hours, and backups.</li></ul>"],
+['3. Scheduling a Delivery',
+ "<ol><li>Tap <strong>+ New</strong> on the Deliveries tab.</li><li><strong>Customer:</strong> search by name or phone. New customer? Type their name, tap <strong>+ Add New Customer</strong>, and fill in phone/address — this customer is now shared with the Saw Shop app too.</li><li>Set the <strong>date</strong>, <strong>time window</strong>, and <strong>driver</strong>.</li><li>Delivering somewhere other than the address on file? Check <strong>\"Deliver to a different address\"</strong> and type it in.</li><li>Want an exact drop-off spot? Tap <strong>📍 Drop a Pin</strong> while standing at the location, or paste a Google Maps link if you already have one.</li><li>Add notes, attach a receipt if you have one, and tap <strong>Save Delivery</strong>.</li></ol>"],
+['4. Running a Delivery',
+ "<p>Tap a delivery card to open it. Move it through <strong>Scheduled → Out for Delivery → Delivered</strong> with the status buttons.</p><ul><li><strong>Couldn't complete it?</strong> Tap <strong>❌ Couldn't Deliver</strong>, pick a reason, and snap a photo if it helps (locked gate, etc.). It bounces back to Scheduled with a red \"Attempted\" badge so the next person knows what happened.</li><li>Once delivered, capture a <strong>Delivery Photo</strong> and the customer's <strong>Signature</strong> right there in the detail view.</li><li>Tap <strong>⬇ Download Proof of Delivery</strong> for a PDF with all of it — open the file and drag it straight into the Rundoo purchase.</li><li><strong>💬 Text Customer</strong> and <strong>👥 Text Coworker</strong> open a pre-filled text on your own phone — you still tap Send.</li></ul>"],
+['5. Incoming Shipments',
+ "<p>Vendor, PO #, items, and expected date. If it's a <strong>special order for a specific customer</strong>, check the box and link their name — once you mark it <strong>Received</strong>, a Text Customer button appears so you can let them know it's ready.</p><p>Marking something Received automatically records who received it and when — no need to type your name.</p>"],
+['6. Order List',
+ "<p>For <strong>yard and bulk items only</strong> — nothing here is tied to a UPC or the POS. Add an item, set the urgency, and it automatically shows who added it. Mark <strong>Ordered</strong> when it's on its way, <strong>Mark Done</strong> once it's in.</p>"],
+['7. Equipment &amp; Checks',
+ "<p>Every truck, forklift, or trailer gets its own record in the <strong>Equipment</strong> tab. In <strong>Settings → Types of Checks</strong>, define what gets checked (fuel, tires, straps, etc.) and how often — daily, weekly, or monthly.</p><p>On an equipment's detail page, tap <strong>✓ OK</strong> or <strong>⚠ Flag</strong> on each check. Flagging lets you add a note and a photo — it stays in that equipment's <strong>Issue Log</strong> for good, even after it's fixed. Use <strong>+ Log an Issue</strong> for anything that doesn't fit a scheduled check.</p>"],
+['8. Tasks',
+ "<p>Anything with a due date that isn't a delivery or a shipment — give it a due date, a priority, and who it's assigned to. Shows up on the calendar right alongside deliveries and incoming shipments.</p>"],
+['9. Your Daily Rhythm',
+ "<p>Start on the <strong>Dashboard</strong> — check the calendar for what's scheduled, run through your recurring checklist. Through the day: move deliveries along, mark shipments received, flag anything on the trucks that needs attention. Need another set of hands? Tap <strong>👥</strong> on any card to text a coworker from wherever you're standing.</p>"],
+['10. Handy Tips',
+ "<ul><li><strong>👥 Text Coworker</strong> is on every card in every tab — no need to open the detail view first.</li><li><strong>Add this app to your home screen</strong> (Settings → Add to Home Screen) so it opens like any other app, full-screen.</li><li>Everything <strong>syncs live</strong> — what you change, everyone sees instantly.</li><li>The <strong>GPS pin-drop</strong> only needs you standing at the right spot once — it's saved for that delivery from then on.</li></ul>"],
+["11. What's Admin-Only",
+ "<p>Deleting anything — a delivery, a shipment, an order list item, a task, a piece of equipment — requires an administrator account. Everyone else gets a message asking them to have Michael sign in and do it. Everything else — scheduling, checks, tasks, texting — is yours to run.</p>"]
+];}
+function buildGuideHTML(forPrint){
+  const intro = forPrint
+    ? `<div style="border:2px solid #1a1a1a;border-radius:6px;padding:14px 16px;margin-bottom:16px"><div style="font-size:1.05rem;font-weight:800;margin-bottom:5px">Miller Hardware Delivery — Staff Guide</div><div style="font-size:.8rem;line-height:1.5">This app runs every delivery, incoming shipment, order-list item, truck/equipment check, and task for the warehouse floor. Read through the sections once, then keep this for reference.</div></div>`
+    : `<div class="guide-intro"><div class="guide-intro-title">Welcome to the Delivery app 👋</div><div class="guide-intro-body">This app runs every delivery, incoming shipment, order-list item, truck/equipment check, and task for the warehouse floor. Read through the sections once, then tap <strong style="color:var(--white)">📖 Guide</strong> up top any time for a refresher.</div></div>`;
+  const secs = guideSections().map(s=>{
+    if(forPrint) return `<div style="margin-bottom:13px;page-break-inside:avoid"><div style="font-weight:800;font-size:.95rem;border-bottom:1.5px solid #ccc;padding-bottom:3px;margin-bottom:6px">${s[0]}</div><div style="font-size:.78rem;line-height:1.5;color:#333">${s[1]}</div></div>`;
+    return `<details class="guide-sec"><summary>${s[0]}</summary><div class="guide-sec-body">${s[1]}</div></details>`;
+  }).join('');
+  return intro + secs;
+}
+function openGuide(){
+  const b = document.getElementById('guide-body'); if(b) b.innerHTML = buildGuideHTML(false);
+  const g = document.getElementById('guide-overlay'); if(g){ g.style.display='block'; g.scrollTop=0; }
+}
+function closeGuide(){ const g = document.getElementById('guide-overlay'); if(g) g.style.display='none'; }
+function printGuide(){
+  const pa = document.getElementById('print-area');
+  pa.innerHTML = `<div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;padding:22px;color:#1a1a1a">${buildGuideHTML(true)}</div>`;
+  pa.style.display = 'block';
+  setTimeout(()=>{ window.print(); setTimeout(()=>{ pa.style.display='none'; }, 500); }, 150);
+}
 
 renderCal();
 renderCustPicker('out');
