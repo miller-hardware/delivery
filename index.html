@@ -986,6 +986,28 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
   </div>
 </div>
 
+<!-- SIGN IN TO SAVE A NEW CUSTOMER (only action that needs a real account) -->
+<div class="overlay" id="cust-signin-modal" style="z-index:1700">
+  <div class="modal center" style="max-width:360px">
+    <div class="mhdr"><span class="mtitle">Sign In to Save This Customer</span><button class="mclose" onclick="closeAll()">×</button></div>
+    <div class="mbody">
+      <p style="font-size:.85rem;color:var(--g5);margin-bottom:12px">Adding a brand-new customer needs your real account — the same login as the Saw Shop app. Ask Michael if you don't have one yet.</p>
+      <div class="fgrp">
+        <label>Name or Email</label>
+        <input type="text" id="cust-signin-name" autocomplete="username" onkeydown="if(event.key==='Enter')doCustomerSignIn()">
+      </div>
+      <div class="fgrp" style="margin-top:10px">
+        <label>Password</label>
+        <input type="password" id="cust-signin-pass" autocomplete="current-password" onkeydown="if(event.key==='Enter')doCustomerSignIn()">
+      </div>
+      <div id="cust-signin-err" style="color:var(--red);font-size:.82rem;min-height:16px;margin-top:8px;text-align:center"></div>
+    </div>
+    <div class="mfoot" style="display:block">
+      <button id="cust-signin-btn" class="btn-save" style="width:100%" onclick="doCustomerSignIn()">Sign In &amp; Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- STAFF GUIDE -->
 <div id="guide-overlay">
   <div class="guide-hdr">
@@ -1032,9 +1054,13 @@ const R = {
   notify: db.ref('dlv3_notify_outbox')
 };
 
-// ── AUTH (silent, automatic — no password screen. Identity lives in device staff
-//    self-registration below, not here. This only exists so Firebase sees someone
-//    as "signed in" for the shared customers-node write rule.) ──────────────────
+// ── AUTH (silent, automatic — no password screen for normal use. Identity for
+//    tasks/notifications lives entirely in device staff self-registration below.
+//    Anonymous sign-in satisfies most Firebase rules, but the shared `customers`
+//    node (Saw Shop's security lockdown) specifically requires a REAL account —
+//    anonymous auth gets PERMISSION_DENIED there. So: silent anonymous sign-in
+//    unlocks the app for everything, and only the "save a new customer" action
+//    additionally requires a real sign-in, via requireRealSignIn() below.) ─────
 let AUTH=null, CURRENT_USER=null;
 const WHOAMI_KEY = 'dlv3_whoami_name';
 function myDisplayName(){
@@ -1052,6 +1078,37 @@ AUTH.onAuthStateChanged(user=>{
   if(user){ hideLoading(); startDataSync(); }
   else { AUTH.signInAnonymously().catch(e=>console.error('Silent sign-in failed:', e)); }
 });
+
+// Gate for the one action that needs a REAL (non-anonymous) account: saving a new customer.
+let _pendingRealSignInAction = null;
+function requireRealSignIn(onSuccess){
+  if(CURRENT_USER && !CURRENT_USER.isAnonymous){ onSuccess(); return; }
+  _pendingRealSignInAction = onSuccess;
+  const nameEl=document.getElementById('cust-signin-name'), passEl=document.getElementById('cust-signin-pass'), errEl=document.getElementById('cust-signin-err');
+  if(nameEl) nameEl.value=''; if(passEl) passEl.value=''; if(errEl) errEl.textContent='';
+  openOv('cust-signin-modal');
+}
+function doCustomerSignIn(){
+  const v = (document.getElementById('cust-signin-name').value||'').trim();
+  const pw = document.getElementById('cust-signin-pass').value||'';
+  const errEl = document.getElementById('cust-signin-err'); errEl.textContent='';
+  if(!v||!pw){ errEl.textContent='Enter your name/email and password.'; return; }
+  const email = v.indexOf('@')>=0 ? v : (v.toLowerCase().replace(/\s+/g,'')+'@millersawshop.local');
+  const btn = document.getElementById('cust-signin-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Signing in…'; }
+  AUTH.signInWithEmailAndPassword(email,pw).then(()=>{
+    closeAll();
+    const action = _pendingRealSignInAction; _pendingRealSignInAction = null;
+    if(action) action();
+  }).catch(e=>{
+    const code = e&&e.code||'';
+    errEl.textContent = (code.indexOf('wrong-password')>=0||code.indexOf('user-not-found')>=0||code.indexOf('invalid-credential')>=0||code.indexOf('invalid-login')>=0) ? 'Wrong name or password.'
+      : (code.indexOf('operation-not-allowed')>=0||code.indexOf('configuration-not-found')>=0) ? "Sign-in isn't enabled yet — finish the Firebase setup step."
+      : code.indexOf('too-many-requests')>=0 ? 'Too many attempts — wait a minute and try again.'
+      : code.indexOf('network')>=0 ? 'No connection — check internet and try again.'
+      : (e.message||'Sign-in failed.');
+  }).then(()=>{ if(btn){ btn.disabled=false; btn.textContent='Sign In'; } });
+}
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let outRecs=[], inRecs=[], olRecs=[], taskRecs=[], chkRecs=[], recurTasks=[], staffList=[], equipList=[], checkTypes=[], equipChecks=[];
@@ -1950,15 +2007,22 @@ function custPickerSaveNew(prefix){
   const first = document.getElementById(prefix+'-nc-first').value.trim();
   const last  = document.getElementById(prefix+'-nc-last').value.trim();
   if(!first && !last){ alert('Enter at least a name.'); return; }
-  const id = genId();
-  const c = { id, first, last,
+  const c = { id:null, first, last,
     phone: document.getElementById(prefix+'-nc-phone').value.trim(),
     email: '',
     addr: document.getElementById(prefix+'-nc-addr').value.trim(),
     notes: '' };
-  R.customers.child(id).set(c);
-  custs[id] = c; // optimistic, listener will confirm
-  custPickerSelect(prefix, id);
+  requireRealSignIn(()=>{
+    const id = genId();
+    c.id = id;
+    R.customers.child(id).set(c).then(()=>{
+      custs[id] = c;
+      custPickerSelect(prefix, id);
+    }).catch(e=>{
+      console.error('Customer save failed:', e);
+      alert("Couldn't save this customer — "+(e.message||'please try again.'));
+    });
+  });
 }
 
 function custPickerSelect(prefix, custId){
