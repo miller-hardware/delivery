@@ -365,7 +365,6 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 
 /* ── STAFF SELF-REGISTRATION ── */
 .whoami-note{font-size:.85rem;color:var(--g5);margin-top:10px;line-height:1.4}
-.whoami-skip{display:block;text-align:center;margin-top:10px;font-family:'Barlow Condensed',sans-serif;font-size:.82rem;letter-spacing:.5px;color:var(--g5);background:none;border:none;cursor:pointer;text-decoration:underline}
 
 /* ── STAFF GUIDE ── */
 #guide-overlay{display:none;position:fixed;inset:0;z-index:4000;background:var(--g1);overflow-y:auto;font-family:'Barlow',sans-serif}
@@ -989,7 +988,20 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
     </div>
     <div class="mfoot" style="display:block">
       <button class="btn-save" style="width:100%" onclick="saveWhoAmI()">Continue</button>
-      <button type="button" class="whoami-skip" onclick="skipWhoAmI()">Skip for now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD TO HOME SCREEN (first-open prompt, once per device) -->
+<div class="overlay" id="install-prompt-modal" style="z-index:1700">
+  <div class="modal center" style="max-width:400px">
+    <div class="mhdr"><span class="mtitle">📲 One More Thing</span></div>
+    <div class="mbody">
+      <p style="font-size:.9rem;color:var(--g5);margin-bottom:14px">Add this app to your home screen so it opens full-screen, like any other app — no browser bar.</p>
+      <div id="install-prompt-box"></div>
+    </div>
+    <div class="mfoot" style="display:block">
+      <button class="btn-save" style="width:100%" onclick="closeInstallPrompt()">Continue to App</button>
     </div>
   </div>
 </div>
@@ -1210,8 +1222,8 @@ function closeAll(){
   document.querySelectorAll('.overlay').forEach(el=>el.classList.remove('open'));
   editKey = {out:null, in:null, ol:null, task:null, equip:null};
 }
-document.addEventListener('click', e=>{ if(e.target.classList.contains('overlay')) closeAll(); });
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeAll(); });
+document.addEventListener('click', e=>{ if(e.target.classList.contains('overlay') && e.target.id!=='whoami-modal') closeAll(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && !document.getElementById('whoami-modal').classList.contains('open')) closeAll(); });
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
 function switchTab(id, btn){
@@ -1219,7 +1231,7 @@ function switchTab(id, btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('panel-'+id).classList.add('active');
-  if(id==='settings'){ renderHrsGrid(); renderRecurList(); renderStaffList(); renderInstallBox(); renderEquipSettingsList(); renderChecktypesList(); renderEquipTypeDatalist(); }
+  if(id==='settings'){ renderHrsGrid(); renderRecurList(); renderStaffList(); renderInstallBox('install-box'); renderEquipSettingsList(); renderChecktypesList(); renderEquipTypeDatalist(); }
 }
 
 // ── CALENDAR ──────────────────────────────────────────────────────────────────
@@ -1851,6 +1863,7 @@ function checkWhoAmI(){
   if(cached){
     myStaffKey = findStaffKeyByName(cached);
     if(myStaffKey) registerForPush(myStaffKey);
+    maybeShowInstallPrompt();
     return;
   }
   openOv('whoami-modal');
@@ -1869,10 +1882,23 @@ function saveWhoAmI(){
     myStaffKey = newRef.key;
     registerForPush(newRef.key);
   }
-  closeAll();
+  maybeShowInstallPrompt();
 }
 
-function skipWhoAmI(){ closeAll(); }
+// Shows the "Add to Home Screen" nudge once per device, right after the (mandatory) name step —
+// separate flag from WHOAMI_KEY since existing staff who registered before this existed should still see it once.
+const INSTALL_PROMPTED_KEY = 'dlv3_install_prompted';
+function maybeShowInstallPrompt(){
+  let prompted = null;
+  try{ prompted = localStorage.getItem(INSTALL_PROMPTED_KEY); }catch(e){}
+  if(prompted || isStandaloneApp()){ closeAll(); return; }
+  renderInstallBox('install-prompt-box');
+  openOv('install-prompt-modal');
+}
+function closeInstallPrompt(){
+  try{ localStorage.setItem(INSTALL_PROMPTED_KEY, '1'); }catch(e){}
+  closeAll();
+}
 
 // ── CUSTOMER PICKER (shared with Saw Shop) ────────────────────────────────────
 // Renders an inline search/select/quick-add widget into a container div.
@@ -3067,8 +3093,10 @@ async function clickInstallApp(){
   renderInstallBox();
 }
 
-function renderInstallBox(){
-  const el = document.getElementById('install-box'); if(!el) return;
+let _installBoxTargetId = 'install-box';
+function renderInstallBox(targetId){
+  if(targetId) _installBoxTargetId = targetId;
+  const el = document.getElementById(_installBoxTargetId); if(!el) return;
   if(isStandaloneApp()){
     el.innerHTML = `<div class="install-ok">✓ You're using the installed app — nice, that's the easiest way to use this on the job.</div>`;
     return;
@@ -3094,25 +3122,25 @@ buildAppIcons();
 // ── STAFF GUIDE ────────────────────────────────────────────────────────────────
 function guideSections(){return [
 ['1. Signing In',
- "<p>Open the app on your phone or the shop tablet. Type your <strong>first name</strong> and your <strong>password</strong>, then tap <strong>Sign In</strong>. Your phone remembers you afterward, so you'll only need to do this once per device.</p><p>This same login works in the <strong>Saw Shop app</strong> too — one account, both apps.</p><p>Signing in for the first time? Accounts aren't self-service — ask Michael to set yours up.</p>"],
+ "<p>Open the app on your phone or the shop tablet. Type your <strong>first name</strong> and your <strong>password</strong>, then tap <strong>Sign In</strong>. Your phone remembers you afterward, so you'll only need to do this once per device.</p><p>This same login works in the <strong>Saw Shop app</strong> too — one account, both apps.</p><p>Signing in for the first time? Accounts aren't self-service — ask Michael to set yours up.</p><p><strong>Right after your first sign-in on a device</strong>, it'll ask for your name again — this one's different, no password, and it's what lets people assign you tasks and deliveries and actually get your phone to notify you about them. It's required — there's no skipping it. Right after that, it'll walk you through adding the app to your home screen. Both only happen once per device.</p>"],
 ['2. The Tabs, at a Glance',
  "<ul><li><strong>Dashboard</strong> — calendar, today's stats, and your daily checklist.</li><li><strong>Deliveries</strong> — everything going out; tap + New to schedule one.</li><li><strong>Incoming</strong> — shipments coming in from vendors, including special orders for customers.</li><li><strong>Order List</strong> — yard items running low. No UPCs here — that's the POS's job.</li><li><strong>Equipment</strong> — trucks, forklifts, trailers — daily/weekly/monthly checks and an issue log for each one.</li><li><strong>Tasks</strong> — anything with a due date that isn't a delivery or a shipment.</li><li><strong>Settings</strong> — recurring checklist tasks, equipment check types, staff for texting, hours, and backups.</li></ul>"],
 ['3. Scheduling a Delivery',
  "<ol><li>Tap <strong>+ New</strong> on the Deliveries tab.</li><li><strong>Customer:</strong> search by name or phone. New customer? Type their name, tap <strong>+ Add New Customer</strong>, and fill in phone/address — this customer is now shared with the Saw Shop app too.</li><li>Set the <strong>date</strong>, <strong>time window</strong>, and <strong>driver</strong>.</li><li>Delivering somewhere other than the address on file? Check <strong>\"Deliver to a different address\"</strong> and type it in.</li><li>Want an exact drop-off spot? Tap <strong>📍 Drop a Pin</strong> while standing at the location, or paste a Google Maps link if you already have one.</li><li>Add notes, attach a receipt if you have one, and tap <strong>Save Delivery</strong>.</li></ol>"],
 ['4. Running a Delivery',
- "<p>Tap a delivery card to open it. Move it through <strong>Scheduled → Out for Delivery → Delivered</strong> with the status buttons.</p><ul><li><strong>Couldn't complete it?</strong> Tap <strong>❌ Couldn't Deliver</strong>, pick a reason, and snap a photo if it helps (locked gate, etc.). It bounces back to Scheduled with a red \"Attempted\" badge so the next person knows what happened.</li><li>Once delivered, capture a <strong>Delivery Photo</strong> and the customer's <strong>Signature</strong> right there in the detail view.</li><li>Tap <strong>⬇ Download Proof of Delivery</strong> for a PDF with all of it — open the file and drag it straight into the Rundoo purchase.</li><li><strong>💬 Text Customer</strong> and <strong>👥 Text Coworker</strong> open a pre-filled text on your own phone — you still tap Send.</li></ul>"],
+ "<p>Tap a delivery card to open it. Move it through <strong>Ordered → Built → Out for Delivery → Delivered</strong> with the status buttons — \"Built\" means it's staged and ready to load. Whoever added the delivery, plus anyone assigned to <strong>Notify</strong>, gets a push notification every time the stage changes.</p><ul><li><strong>Couldn't complete it?</strong> Tap <strong>❌ Couldn't Deliver</strong>, pick a reason, and snap a photo if it helps (locked gate, etc.). It bounces back to Built (not all the way to Ordered) with a red \"Attempted\" badge so the next person knows what happened.</li><li>Once delivered, capture a <strong>Delivery Photo</strong> and the customer's <strong>Signature</strong> right there in the detail view.</li><li>Tap <strong>⬇ Download Proof of Delivery</strong> for a PDF with all of it — open the file and drag it straight into the Rundoo purchase.</li><li><strong>💬 Text Customer</strong> and <strong>👥 Text Coworker</strong> open a pre-filled text on your own phone — you still tap Send.</li></ul>"],
 ['5. Incoming Shipments',
- "<p>Vendor, PO #, items, and expected date. If it's a <strong>special order for a specific customer</strong>, check the box and link their name — once you mark it <strong>Received</strong>, a Text Customer button appears so you can let them know it's ready.</p><p>Marking something Received automatically records who received it and when — no need to type your name.</p>"],
+ "<p>Vendor, PO #, items, and expected date — status runs <strong>Ordered → Partial → Received</strong> (auto-flags <strong>Overdue</strong> if the expected date passes). Assign up to 3 people to <strong>Notify</strong> and they'll get a push every time the status changes.</p><p>If it's a <strong>special order for a specific customer</strong>, check the box and link their name — once you mark it <strong>Received</strong>, a Text Customer button appears so you can let them know it's ready.</p><p>Marking something Received automatically records who received it and when — no need to type your name.</p>"],
 ['6. Order List',
  "<p>For <strong>yard and bulk items only</strong> — nothing here is tied to a UPC or the POS. Add an item, set the urgency, and it automatically shows who added it. Mark <strong>Ordered</strong> when it's on its way, <strong>Mark Done</strong> once it's in.</p>"],
 ['7. Equipment &amp; Checks',
  "<p>Every truck, forklift, or trailer gets its own record in the <strong>Equipment</strong> tab. In <strong>Settings → Types of Checks</strong>, define what gets checked (fuel, tires, straps, etc.) and how often — daily, weekly, or monthly.</p><p>On an equipment's detail page, tap <strong>✓ OK</strong> or <strong>⚠ Flag</strong> on each check. Flagging lets you add a note and a photo — it stays in that equipment's <strong>Issue Log</strong> for good, even after it's fixed. Use <strong>+ Log an Issue</strong> for anything that doesn't fit a scheduled check.</p>"],
 ['8. Tasks',
- "<p>Anything with a due date that isn't a delivery or a shipment — give it a due date, a priority, and who it's assigned to. Shows up on the calendar right alongside deliveries and incoming shipments.</p>"],
+ "<p>Anything with a due date that isn't a delivery or a shipment. Give it a due date, a priority, and <strong>assign up to 3 people</strong> — they get a push notification the moment you save it.</p><p><strong>Want reminders?</strong> Set Reminder to Daily, Weekly, or One-time and a push goes out automatically until the task is marked done (the daily/weekly check runs once a day, around 8am).</p><p><strong>Inventory tasks:</strong> check \"This is an inventory list task\" and build a line-by-line list when you create it — every item you need counted or restocked. Whoever it's assigned to fills in a quantity for each item one at a time, with a progress line so nothing gets missed. When they mark it complete, you get a push back with the whole filled-in list. Regular tasks just get a free-text reply instead.</p>"],
 ['9. Your Daily Rhythm',
- "<p>Start on the <strong>Dashboard</strong> — check the calendar for what's scheduled, run through your recurring checklist. Through the day: move deliveries along, mark shipments received, flag anything on the trucks that needs attention. Need another set of hands? Tap <strong>👥</strong> on any card to text a coworker from wherever you're standing.</p>"],
+ "<p>Start on the <strong>Dashboard</strong> — check the calendar for what's scheduled, run through your recurring checklist. Through the day: move deliveries along, mark shipments received, flag anything on the trucks that needs attention. Need another set of hands? Tap <strong>👥</strong> on any card to text a coworker from wherever you're standing, or assign them and let the push notification do the work.</p>"],
 ['10. Handy Tips',
- "<ul><li><strong>👥 Text Coworker</strong> is on every card in every tab — no need to open the detail view first.</li><li><strong>Add this app to your home screen</strong> (Settings → Add to Home Screen) so it opens like any other app, full-screen.</li><li>Everything <strong>syncs live</strong> — what you change, everyone sees instantly.</li><li>The <strong>GPS pin-drop</strong> only needs you standing at the right spot once — it's saved for that delivery from then on.</li></ul>"],
+ "<ul><li><strong>👥 Text Coworker</strong> is on every card in every tab — no need to open the detail view first.</li><li><strong>Push notifications</strong> only work once you've allowed them when your phone's browser asks — if you tapped \"Block\" by mistake, you'll need to turn notifications back on for this site in your phone's browser settings.</li><li>Everything <strong>syncs live</strong> — what you change, everyone sees instantly.</li><li>The <strong>GPS pin-drop</strong> only needs you standing at the right spot once — it's saved for that delivery from then on.</li></ul>"],
 ["11. What's Admin-Only",
  "<p>Deleting anything — a delivery, a shipment, an order list item, a task, a piece of equipment — requires an administrator account. Everyone else gets a message asking them to have Michael sign in and do it. Everything else — scheduling, checks, tasks, texting — is yours to run.</p>"]
 ];}
