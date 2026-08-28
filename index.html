@@ -346,6 +346,27 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 .install-step-txt b{color:var(--red)}
 .install-btn-row{margin-top:4px}
 
+/* ── ASSIGNEE PICKER (Tasks / Deliveries / Incoming) ── */
+.assignee-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.assignee-chip{display:inline-flex;align-items:center;gap:5px;background:var(--blue-bg);color:var(--blue);border-radius:14px;padding:4px 6px 4px 10px;font-size:.85rem;font-weight:600}
+.assignee-chip button{background:none;border:none;color:var(--blue);font-size:1rem;cursor:pointer;line-height:1;padding:0 2px}
+
+/* ── INVENTORY TASK ITEMS ── */
+.inv-item-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--g0);border:1px solid var(--bd);border-radius:6px;padding:9px 12px;margin-bottom:7px}
+.inv-item-name{font-size:.95rem;font-weight:600;color:var(--ink);flex:1;min-width:0}
+.inv-item-qty{width:80px;flex-shrink:0;font-family:'Barlow',sans-serif;font-size:1rem;padding:8px 10px;border:1px solid var(--bd);border-radius:5px;outline:none;text-align:center}
+.inv-item-qty:focus{border-color:var(--red)}
+.inv-item-qty.filled{border-color:var(--green);background:var(--green-bg)}
+.inv-item-form-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--white);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;margin-bottom:6px}
+.inv-item-form-row span{font-size:.92rem;color:var(--ink)}
+.inv-item-form-row button{background:none;border:none;color:var(--g3);cursor:pointer;font-size:1rem}
+.inv-item-form-row button:hover{color:var(--red)}
+.inv-progress{font-family:'Barlow Condensed',sans-serif;font-size:.78rem;letter-spacing:1px;text-transform:uppercase;color:var(--g5);margin-bottom:8px}
+
+/* ── STAFF SELF-REGISTRATION ── */
+.whoami-note{font-size:.85rem;color:var(--g5);margin-top:10px;line-height:1.4}
+.whoami-skip{display:block;text-align:center;margin-top:10px;font-family:'Barlow Condensed',sans-serif;font-size:.82rem;letter-spacing:.5px;color:var(--g5);background:none;border:none;cursor:pointer;text-decoration:underline}
+
 /* ── STAFF GUIDE ── */
 #guide-overlay{display:none;position:fixed;inset:0;z-index:4000;background:var(--g1);overflow-y:auto;font-family:'Barlow',sans-serif}
 .guide-hdr{position:sticky;top:0;background:var(--ink);color:var(--white);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;z-index:2}
@@ -677,6 +698,10 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
         </div>
         <div class="fgrp"><label>Driver</label><input type="text" id="o-driver" list="staff-datalist" placeholder="Who's running this?"></div>
         <div class="fgrp">
+          <label>Notify (up to 3 people)</label>
+          <div id="out-assignee-picker"></div>
+        </div>
+        <div class="fgrp">
           <label class="fchk"><input type="checkbox" id="o-alt-addr-chk" onchange="toggleAltAddress()"> Deliver to a different address than the one on file</label>
           <div id="o-alt-addr-wrap" style="display:none;margin-top:6px">
             <input type="text" id="o-alt-address" placeholder="Street, City, ZIP for this delivery">
@@ -693,7 +718,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
         <div class="fgrp"><label>Notes</label><textarea id="o-notes" placeholder="Gate code, special instructions…"></textarea></div>
         <div class="fgrp">
           <label>Status</label>
-          <select id="o-status"><option>Scheduled</option><option>Out for Delivery</option><option>Delivered</option></select>
+          <select id="o-status"><option>Ordered</option><option>Built</option><option>Out for Delivery</option><option>Delivered</option></select>
         </div>
         <div class="fdiv">Receipt / Document (optional)</div>
         <div class="fgrp">
@@ -727,8 +752,12 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
         <div class="fr">
           <div class="fgrp"><label>Expected Date</label><input type="date" id="i-exp"></div>
           <div class="fgrp"><label>Status</label>
-            <select id="i-status"><option>Expected</option><option>Partial</option><option>Received</option><option>Overdue</option></select>
+            <select id="i-status"><option>Ordered</option><option>Partial</option><option>Received</option><option>Overdue</option></select>
           </div>
+        </div>
+        <div class="fgrp">
+          <label>Notify (up to 3 people)</label>
+          <div id="in-assignee-picker"></div>
         </div>
         <label class="fchk"><input type="checkbox" id="i-spec" onchange="toggleSpecOrderUI()"> Special order for a customer</label>
         <div id="i-cust-wrap" style="display:none">
@@ -778,7 +807,27 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
             <select id="tk-priority"><option value="High">🔴 High</option><option value="Medium" selected>🟡 Medium</option><option value="Low">🟢 Low</option></select>
           </div>
         </div>
-        <div class="fgrp"><label>Assigned To</label><input type="text" id="tk-who" list="staff-datalist" placeholder="Employee name"></div>
+        <div class="fgrp">
+          <label>Assign / Notify (up to 3 people)</label>
+          <div id="task-assignee-picker"></div>
+        </div>
+        <div class="fgrp"><label>Reminder</label>
+          <select id="tk-reminder-freq">
+            <option value="">No reminder</option>
+            <option value="once">One-time (on due date)</option>
+            <option value="daily">Daily until done</option>
+            <option value="weekly">Weekly until done</option>
+          </select>
+        </div>
+        <label class="fchk"><input type="checkbox" id="tk-inv-chk" onchange="toggleTaskInvUI()"> This is an inventory list task</label>
+        <div class="fgrp" id="tk-inv-wrap" style="display:none">
+          <label>Inventory Items</label>
+          <div id="tk-inv-list"></div>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <input type="text" class="srch" id="tk-inv-item-inp" placeholder="Item name…" onkeydown="if(event.key==='Enter'){event.preventDefault();addTaskInvItem();}">
+            <button type="button" class="btn btn-ink" style="padding:8px 14px;font-size:.85rem" onclick="addTaskInvItem()">+ Add</button>
+          </div>
+        </div>
         <div class="fgrp"><label>Notes</label><textarea id="tk-notes" placeholder="Details, instructions…"></textarea></div>
       </div>
     </div>
@@ -927,6 +976,24 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 <datalist id="staff-datalist"></datalist>
 <datalist id="equip-type-datalist"></datalist>
 
+<!-- WHO ARE YOU (device staff registration — nothing to do with the secure login) -->
+<div class="overlay" id="whoami-modal" style="z-index:1700">
+  <div class="modal center" style="max-width:360px">
+    <div class="mhdr"><span class="mtitle">Quick Setup</span></div>
+    <div class="mbody">
+      <div class="fgrp">
+        <label>What's your name?</label>
+        <input type="text" id="whoami-name" list="staff-datalist" placeholder="First name" onkeydown="if(event.key==='Enter')saveWhoAmI()">
+      </div>
+      <div class="whoami-note">This just lets tasks and deliveries be assigned and notified to you on this phone — it's not related to signing in.</div>
+    </div>
+    <div class="mfoot" style="display:block">
+      <button class="btn-save" style="width:100%" onclick="saveWhoAmI()">Continue</button>
+      <button type="button" class="whoami-skip" onclick="skipWhoAmI()">Skip for now</button>
+    </div>
+  </div>
+</div>
+
 <!-- STAFF GUIDE -->
 <div id="guide-overlay">
   <div class="guide-hdr">
@@ -944,6 +1011,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
 <script>
 // ── FIREBASE ──────────────────────────────────────────────────────────────────
 firebase.initializeApp({
@@ -968,7 +1036,8 @@ const R = {
   staff:  db.ref('dlv3_staff'),
   equipment:  db.ref('dlv3_equipment'),
   checkTypes: db.ref('dlv3_checktypes'),
-  equipChecks: db.ref('dlv3_equipchecks')
+  equipChecks: db.ref('dlv3_equipchecks'),
+  notify: db.ref('dlv3_notify_outbox')
 };
 
 // ── AUTH (shared staff login — same Firebase Auth user pool as the Saw Shop app) ─
@@ -1049,6 +1118,7 @@ function startDataSync(){
   if(nameEl) nameEl.textContent = myDisplayName();
   const stripEl = document.getElementById('account-strip');
   if(stripEl) stripEl.style.display = 'flex';
+  setTimeout(checkWhoAmI, 800);
 
   db.ref('.info/connected').on('value', s => {
     const on = s.val();
@@ -1234,7 +1304,7 @@ function openCalDay(ds){
   const evs = [];
   outRecs.filter(r=>r.date===ds).forEach(r=>evs.push({type:'red',label:custName(r.custId)+' — '+(r.status||''),tag:'Delivery',key:r._k,tab:'out'}));
   inRecs.filter(r=>r.expected===ds).forEach(r=>evs.push({type:'blue',label:(r.vendor||'Inbound')+' — '+(r.status||''),tag:r.isSpecialOrder?'Incoming · Special Order':'Incoming',key:r._k,tab:'in'}));
-  taskRecs.filter(r=>r.dueDate===ds).forEach(r=>evs.push({type:'amber',label:(r.title||'Task')+(r.assignedTo?' — '+r.assignedTo:''),tag:'Task'+(r.done?' · Done':''),key:r._k,tab:'task'}));
+  taskRecs.filter(r=>r.dueDate===ds).forEach(r=>evs.push({type:'amber',label:(r.title||'Task')+((r.assignees&&r.assignees.length)?' — '+r.assignees.map(a=>a.name).join(', '):''),tag:'Task'+(r.done?' · Done':''),key:r._k,tab:'task'}));
 
   const [y,m,d] = ds.split('-');
   const label = MONTHS[+m-1]+' '+(+d)+', '+y;
@@ -1725,10 +1795,84 @@ function renderStaffList(){
   }
   wrap.innerHTML = staffList.map(st=>`
     <div class="staff-row">
-      <span class="staff-name">${esc(st.name)} <span style="color:var(--g5);font-weight:400">${esc(st.phone)}</span></span>
+      <span class="staff-name">${esc(st.name)} <span style="color:var(--g5);font-weight:400">${esc(st.phone)}</span>${st.pushToken?' <span style=\"color:var(--green)\">🔔</span>':''}</span>
       <button class="staff-del" onclick="deleteStaff('${st._k}')">✕</button>
     </div>`).join('');
 }
+
+// ── PUSH NOTIFICATIONS (Firebase Cloud Messaging) ─────────────────────────────
+// Paste the Web Push key from Firebase Console → Project Settings → Cloud Messaging → "Generate Key Pair".
+const FCM_VAPID_KEY = '';
+let _swRegistration = null;
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('firebase-messaging-sw.js').then(reg=>{
+    _swRegistration = reg;
+  }).catch(e=>console.error('Service worker registration failed:', e));
+}
+
+function registerForPush(staffKey){
+  if(!FCM_VAPID_KEY){ return; } // push isn't configured yet — silently skip
+  if(!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  Notification.requestPermission().then(perm=>{
+    if(perm!=='granted') return;
+    try{
+      const messaging = firebase.messaging();
+      messaging.getToken({vapidKey:FCM_VAPID_KEY, serviceWorkerRegistration:_swRegistration}).then(token=>{
+        if(token) R.staff.child(staffKey).update({pushToken:token, pushTokenAt:new Date().toISOString()});
+      }).catch(e=>console.error('FCM getToken error:', e));
+    }catch(e){ console.error('FCM init error:', e); }
+  });
+}
+
+// Foreground messages (app already open) don't show automatically — display them ourselves.
+if(FCM_VAPID_KEY){
+  try{
+    firebase.messaging().onMessage(payload=>{
+      const title = (payload.notification&&payload.notification.title) || 'Miller Hardware Delivery';
+      const body = (payload.notification&&payload.notification.body) || '';
+      if(Notification.permission==='granted') new Notification(title, {body});
+    });
+  }catch(e){}
+}
+
+// ── STAFF SELF-REGISTRATION (device-local — separate from the secure login) ──
+const WHOAMI_KEY = 'dlv3_whoami_name';
+let myStaffKey = null;
+
+function findStaffKeyByName(name){
+  const match = staffList.find(st=>st.name.toLowerCase()===name.toLowerCase());
+  return match ? match._k : null;
+}
+
+function checkWhoAmI(){
+  let cached = null;
+  try{ cached = localStorage.getItem(WHOAMI_KEY); }catch(e){}
+  if(cached){
+    myStaffKey = findStaffKeyByName(cached);
+    if(myStaffKey) registerForPush(myStaffKey);
+    return;
+  }
+  openOv('whoami-modal');
+}
+
+function saveWhoAmI(){
+  const name = document.getElementById('whoami-name').value.trim();
+  if(!name){ alert('Please enter your name.'); return; }
+  try{ localStorage.setItem(WHOAMI_KEY, name); }catch(e){}
+  const existing = staffList.find(st=>st.name.toLowerCase()===name.toLowerCase());
+  if(existing){
+    myStaffKey = existing._k;
+    registerForPush(existing._k);
+  } else {
+    const newRef = R.staff.push({name, phone:'', created:new Date().toISOString()});
+    myStaffKey = newRef.key;
+    registerForPush(newRef.key);
+  }
+  closeAll();
+}
+
+function skipWhoAmI(){ closeAll(); }
 
 // ── CUSTOMER PICKER (shared with Saw Shop) ────────────────────────────────────
 // Renders an inline search/select/quick-add widget into a container div.
@@ -1827,11 +1971,67 @@ function custPickerSelect(prefix, custId){
   renderCustPicker(prefix);
 }
 
+// ── ASSIGNEE PICKER (shared by Tasks, Deliveries, Incoming — pick 1-3 staff) ──
+const assigneePickerState = { task:[], out:[], in:[] };
+
+function renderAssigneePicker(prefix){
+  const el = document.getElementById(prefix+'-assignee-picker'); if(!el) return;
+  const selected = assigneePickerState[prefix];
+  const chips = selected.map(a=>`<span class="assignee-chip">${esc(a.name)}<button type="button" onclick="removeAssignee('${prefix}','${a.key}')">×</button></span>`).join('');
+  let html = `<div class="assignee-chips">${chips}</div>`;
+  if(selected.length>=3){
+    html += `<div style="font-size:.82rem;color:var(--g5);font-style:italic">Max 3 people</div>`;
+  } else {
+    html += `<input type="text" class="srch" id="${prefix}-assignee-srch" placeholder="Search staff to notify…" oninput="assigneeSearch('${prefix}')" autocomplete="off">
+      <div id="${prefix}-assignee-results" class="cust-results" style="display:none;margin-top:4px"></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function assigneeSearch(prefix){
+  const raw = (document.getElementById(prefix+'-assignee-srch')?.value||'').trim().toLowerCase();
+  const resultsEl = document.getElementById(prefix+'-assignee-results'); if(!resultsEl) return;
+  if(!raw){ resultsEl.style.display='none'; resultsEl.innerHTML=''; return; }
+  const selectedKeys = new Set(assigneePickerState[prefix].map(a=>a.key));
+  const matches = staffList.filter(st=>!selectedKeys.has(st._k) && st.name.toLowerCase().includes(raw)).slice(0,6);
+  if(!matches.length){
+    resultsEl.innerHTML = '<div style="padding:10px 12px;color:var(--g5);font-size:.85rem;font-style:italic">No staff found — add them in Settings.</div>';
+  } else {
+    resultsEl.innerHTML = matches.map(st=>`<div class="cust-result" onclick="addAssignee('${prefix}','${st._k}')">${esc(st.name)}</div>`).join('');
+  }
+  resultsEl.style.display = 'block';
+}
+
+function addAssignee(prefix, staffKey){
+  if(assigneePickerState[prefix].length>=3) return;
+  const st = staffList.find(x=>x._k===staffKey); if(!st) return;
+  assigneePickerState[prefix].push({key:st._k, name:st.name});
+  renderAssigneePicker(prefix);
+}
+
+function removeAssignee(prefix, staffKey){
+  assigneePickerState[prefix] = assigneePickerState[prefix].filter(a=>a.key!==staffKey);
+  renderAssigneePicker(prefix);
+}
+
+// ── NOTIFY (sends a push to a record's creator + assignees on stage changes) ──
+function notifyAssignees(kind, r, eventText){
+  // Collect target staff keys: whoever created it + whoever it's assigned to.
+  const targets = new Set();
+  if(r.createdByKey) targets.add(r.createdByKey);
+  (r.assignees||[]).forEach(a=>targets.add(a.key));
+  if(!targets.size) return;
+  const title = kind==='task' ? (r.title||'Task') : kind==='out' ? 'Delivery — '+custName(r.custId) : 'Incoming — '+(r.vendor||'');
+  targets.forEach(staffKey=>{
+    R.notify.push({ staffKey, title, body: eventText, kind, created: new Date().toISOString() });
+  });
+}
+
 // ── OUTBOUND DELIVERIES ───────────────────────────────────────────────────────
-const OUT_STATUS = ['Scheduled','Out for Delivery','Delivered'];
-const OUT_COL = {'Scheduled':'var(--purple)','Out for Delivery':'var(--blue)','Delivered':'var(--green)'};
-const OUT_BDGE = {'Scheduled':'b-scheduled','Out for Delivery':'b-out','Delivered':'b-delivered'};
-const OUT_SCLS = {'Scheduled':'s-scheduled','Out for Delivery':'s-out','Delivered':'s-delivered'};
+const OUT_STATUS = ['Ordered','Built','Out for Delivery','Delivered'];
+const OUT_COL = {'Ordered':'var(--purple)','Built':'var(--blue)','Out for Delivery':'var(--amber)','Delivered':'var(--green)'};
+const OUT_BDGE = {'Ordered':'b-scheduled','Built':'b-out','Out for Delivery':'b-partial','Delivered':'b-delivered'};
+const OUT_SCLS = {'Ordered':'s-scheduled','Built':'s-out','Out for Delivery':'s-partial','Delivered':'s-delivered'};
 
 function openOutForm(key){
   editKey.out=key||null; tmpReceipt.o=null; tmpReceipt.oType=null;
@@ -1844,13 +2044,15 @@ function openOutForm(key){
   document.getElementById('o-date').value    = r?.date   ||TODAY();
   document.getElementById('o-window').value  = r?.window ||'';
   document.getElementById('o-driver').value  = r?.driver ||'';
+  assigneePickerState.out = r?.assignees ? r.assignees.map(a=>({...a})) : [];
+  renderAssigneePicker('out');
   document.getElementById('o-maplink').value = r?.mapLink||'';
   document.getElementById('o-pin-status').textContent = '';
   document.getElementById('o-alt-addr-chk').checked = !!r?.altAddress;
   document.getElementById('o-alt-address').value = r?.altAddress||'';
   document.getElementById('o-alt-addr-wrap').style.display = r?.altAddress ? 'block' : 'none';
   document.getElementById('o-notes').value   = r?.notes  ||'';
-  document.getElementById('o-status').value  = r?.status ||'Scheduled';
+  document.getElementById('o-status').value  = r?.status ||'Ordered';
   if(r?.receipt){
     tmpReceipt.o=r.receipt; tmpReceipt.oType=r.receiptType||'img';
     renderReceiptPrev('o',r.receiptName||'receipt.pdf',tmpReceipt.oType);
@@ -1886,6 +2088,7 @@ function saveOut(){
     date:document.getElementById('o-date').value,
     window:document.getElementById('o-window').value.trim(),
     driver:document.getElementById('o-driver').value.trim(),
+    assignees: assigneePickerState.out.slice(),
     altAddress: useAltAddr ? document.getElementById('o-alt-address').value.trim() : '',
     mapLink:document.getElementById('o-maplink').value.trim(),
     notes:document.getElementById('o-notes').value.trim(),
@@ -1894,16 +2097,20 @@ function saveOut(){
     updated:new Date().toISOString()
   };
   if(editKey.out){ R.out.child(editKey.out).update(rec).catch(e=>console.error(e)); }
-  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; R.out.push(rec).catch(e=>console.error(e)); }
+  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; rec.createdByKey=myStaffKey||null; R.out.push(rec).catch(e=>console.error(e)); }
   closeAll();
 }
 
 function setOutStatus(key, status){
   R.out.child(key).update({status, updated:new Date().toISOString()});
+  const r = outRecs.find(x=>x._k===key);
+  if(r) notifyAssignees('out', r, `${custName(r.custId)}'s delivery is now: ${status}`);
   closeAll();
 }
 function markDelivered(key){
   R.out.child(key).update({status:'Delivered', updated:new Date().toISOString()});
+  const r = outRecs.find(x=>x._k===key);
+  if(r) notifyAssignees('out', r, `${custName(r.custId)}'s delivery is complete.`);
   closeAll();
 }
 
@@ -1951,6 +2158,7 @@ function openDetOut(key){
         ${r.window?`<div><div class="dlbl">Time Window</div><div class="dval">${esc(r.window)}</div></div>`:''}
         ${r.driver?`<div><div class="dlbl">Driver</div><div class="dval">${esc(r.driver)}</div></div>`:''}
         ${r.createdBy?`<div><div class="dlbl">Added By</div><div class="dval">${esc(r.createdBy)}</div></div>`:''}
+        ${(r.assignees&&r.assignees.length)?`<div><div class="dlbl">Notify</div><div class="dval">${esc(r.assignees.map(a=>a.name).join(', '))}</div></div>`:''}
         ${r.notes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(r.notes)}</div></div>`:''}
       </div>
     </div>
@@ -2019,11 +2227,12 @@ function renderOut(){
         </div>
       </div>`).join('');
   }
-  const total=outRecs.length,sch=outRecs.filter(r=>r.status==='Scheduled').length,
+  const total=outRecs.length,ord=outRecs.filter(r=>r.status==='Ordered').length,
+    built=outRecs.filter(r=>r.status==='Built').length,
     enr=outRecs.filter(r=>r.status==='Out for Delivery').length,
     del=outRecs.filter(r=>r.status==='Delivered').length;
   const s=document.getElementById('out-stats');
-  if(s)s.innerHTML=`<div class="stat red"><div class="stat-lbl">Total</div><div class="stat-val">${total}</div></div><div class="stat"><div class="stat-lbl">Scheduled</div><div class="stat-val">${sch}</div></div><div class="stat blue"><div class="stat-lbl">En Route</div><div class="stat-val">${enr}</div></div><div class="stat green"><div class="stat-lbl">Delivered</div><div class="stat-val">${del}</div></div>`;
+  if(s)s.innerHTML=`<div class="stat red"><div class="stat-lbl">Total</div><div class="stat-val">${total}</div></div><div class="stat"><div class="stat-lbl">Ordered</div><div class="stat-val">${ord}</div></div><div class="stat blue"><div class="stat-lbl">Built</div><div class="stat-val">${built}</div></div><div class="stat amber"><div class="stat-lbl">En Route</div><div class="stat-val">${enr}</div></div><div class="stat green"><div class="stat-lbl">Delivered</div><div class="stat-val">${del}</div></div>`;
   const p=document.getElementById('p-out'); if(p)p.textContent=outRecs.filter(r=>r.status!=='Delivered').length;
 }
 
@@ -2106,7 +2315,7 @@ function saveFailedAttempt(){
   const existing = outRecs.find(x=>x._k===_failKey);
   const ts = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
   const upd = {
-    status: 'Scheduled',
+    status: 'Built',
     lastAttemptReason: document.getElementById('fail-reason').value,
     lastAttemptNotes: document.getElementById('fail-notes').value.trim(),
     lastAttemptAt: ts,
@@ -2116,6 +2325,7 @@ function saveFailedAttempt(){
   if(tmpFailPhoto){ upd.lastAttemptPhoto = tmpFailPhoto; }
   const key = _failKey;
   R.out.child(key).update(upd);
+  if(existing) notifyAssignees('out', existing, `Couldn't deliver to ${custName(existing.custId)}: ${upd.lastAttemptReason}. Back to Built.`);
   closeAll();
   setTimeout(()=>openDetOut(key), 100);
 }
@@ -2238,11 +2448,11 @@ function compress(file, cb){
 }
 
 // ── INBOUND / INCOMING ────────────────────────────────────────────────────────
-const IN_STATUS=['Expected','Partial','Received'];
-function effectiveInStatus(r){ return (r.status==='Expected'&&r.expected&&r.expected<TODAY())?'Overdue':r.status; }
-const IN_COL={'Expected':'var(--blue)','Partial':'var(--amber)','Received':'var(--green)','Overdue':'var(--red)'};
-const IN_BDGE={'Expected':'b-expected','Partial':'b-partial','Received':'b-received','Overdue':'b-overdue'};
-const IN_SCLS={'Expected':'s-expected','Partial':'s-partial','Received':'s-received','Overdue':'s-overdue'};
+const IN_STATUS=['Ordered','Partial','Received'];
+function effectiveInStatus(r){ return (r.status==='Ordered'&&r.expected&&r.expected<TODAY())?'Overdue':r.status; }
+const IN_COL={'Ordered':'var(--blue)','Partial':'var(--amber)','Received':'var(--green)','Overdue':'var(--red)'};
+const IN_BDGE={'Ordered':'b-expected','Partial':'b-partial','Received':'b-received','Overdue':'b-overdue'};
+const IN_SCLS={'Ordered':'s-expected','Partial':'s-partial','Received':'s-received','Overdue':'s-overdue'};
 
 function toggleSpecOrderUI(){
   const on = document.getElementById('i-spec').checked;
@@ -2258,11 +2468,13 @@ function openInForm(key){
   document.getElementById('i-po').value      =r?.po      ||'';
   document.getElementById('i-items').value   =r?.items   ||'';
   document.getElementById('i-exp').value     =r?.expected||'';
-  document.getElementById('i-status').value  =r?.status  ||'Expected';
+  document.getElementById('i-status').value  =r?.status  ||'Ordered';
   document.getElementById('i-rcvdate').value =r?.rcvdate ||'';
   document.getElementById('i-notes').value   =r?.notes   ||'';
   document.getElementById('i-spec').checked  = !!r?.isSpecialOrder;
   custPickerState.in.custId = r?.custId || null;
+  assigneePickerState.in = r?.assignees ? r.assignees.map(a=>({...a})) : [];
+  renderAssigneePicker('in');
   toggleSpecOrderUI();
   openOv('form-in');
 }
@@ -2272,15 +2484,16 @@ function saveIn(){
   if(!vendor){alert('Vendor name is required.');return;}
   let status=document.getElementById('i-status').value;
   const exp=document.getElementById('i-exp').value;
-  if(status==='Expected'&&exp&&exp<TODAY()) status='Overdue';
+  if(status==='Ordered'&&exp&&exp<TODAY()) status='Overdue';
   const isSpecialOrder = document.getElementById('i-spec').checked;
   const rec={vendor,po:document.getElementById('i-po').value.trim(),items:document.getElementById('i-items').value.trim(),
     expected:exp,status,
+    assignees: assigneePickerState.in.slice(),
     rcvdate:document.getElementById('i-rcvdate').value,notes:document.getElementById('i-notes').value.trim(),
     isSpecialOrder, custId: isSpecialOrder ? (custPickerState.in.custId||null) : null,
     updated:new Date().toISOString()};
   if(editKey.in){ R.in.child(editKey.in).update(rec).catch(e=>console.error(e)); }
-  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; R.in.push(rec).catch(e=>console.error(e)); }
+  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; rec.createdByKey=myStaffKey||null; R.in.push(rec).catch(e=>console.error(e)); }
   closeAll();
 }
 
@@ -2288,8 +2501,9 @@ function setInStatus(key,status){
   const upd={status,updated:new Date().toISOString()};
   if(status==='Received'){ upd.rcvdate=TODAY(); upd.rcvby=myDisplayName()||'Unknown'; }
   R.in.child(key).update(upd);
-  closeAll();
   const r = inRecs.find(x=>x._k===key);
+  if(r) notifyAssignees('in', r, `${r.vendor||'Incoming order'} is now: ${status}`);
+  closeAll();
   if(status==='Received' && r && r.isSpecialOrder){
     setTimeout(()=>openDetIn(key), 150);
   }
@@ -2334,7 +2548,7 @@ function openDetIn(key){
   const r=inRecs.find(x=>x._k===key); if(!r) return;
   const effStatus=effectiveInStatus(r);
   const ovd=effStatus==='Overdue';
-  const displayStatuses=ovd?['Overdue','Expected','Partial','Received']:IN_STATUS;
+  const displayStatuses=ovd?['Overdue','Ordered','Partial','Received']:IN_STATUS;
   const statusBtns=displayStatuses.map(s=>{const isCur=s===effStatus;return`
     <button class="sbtn" style="background:${isCur?'var(--g3)':IN_COL[s]};${isCur?'opacity:.5;cursor:default':''}"
       onclick="${isCur?'':`setInStatus('${key}','${s}')`}" ${isCur?'disabled':''}>
@@ -2358,6 +2572,7 @@ function openDetIn(key){
         ${r.rcvdate?`<div><div class="dlbl">Received</div><div class="dval">${fmtDate(r.rcvdate)}</div></div>`:''}
         ${r.rcvby?`<div><div class="dlbl">Received By</div><div class="dval">${esc(r.rcvby)}</div></div>`:''}
         ${r.createdBy?`<div><div class="dlbl">Added By</div><div class="dval">${esc(r.createdBy)}</div></div>`:''}
+        ${(r.assignees&&r.assignees.length)?`<div><div class="dlbl">Notify</div><div class="dval">${esc(r.assignees.map(a=>a.name).join(', '))}</div></div>`:''}
         ${r.notes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(r.notes)}</div></div>`:''}
       </div>
     </div>
@@ -2399,11 +2614,11 @@ function renderIn(){
         </div>
       </div>`;}).join('');
   }
-  const exp=inRecs.filter(r=>r.status==='Expected').length,
+  const exp=inRecs.filter(r=>r.status==='Ordered').length,
     ov=inRecs.filter(r=>r.status==='Overdue').length,
     rcv=inRecs.filter(r=>r.status==='Received').length;
   const s=document.getElementById('in-stats');
-  if(s)s.innerHTML=`<div class="stat blue"><div class="stat-lbl">Expected</div><div class="stat-val">${exp}</div></div><div class="stat red"><div class="stat-lbl">Overdue</div><div class="stat-val">${ov}</div></div><div class="stat amber"><div class="stat-lbl">Partial</div><div class="stat-val">${inRecs.filter(r=>r.status==='Partial').length}</div></div><div class="stat green"><div class="stat-lbl">Received</div><div class="stat-val">${rcv}</div></div>`;
+  if(s)s.innerHTML=`<div class="stat blue"><div class="stat-lbl">Ordered</div><div class="stat-val">${exp}</div></div><div class="stat red"><div class="stat-lbl">Overdue</div><div class="stat-val">${ov}</div></div><div class="stat amber"><div class="stat-lbl">Partial</div><div class="stat-val">${inRecs.filter(r=>r.status==='Partial').length}</div></div><div class="stat green"><div class="stat-lbl">Received</div><div class="stat-val">${rcv}</div></div>`;
   const p=document.getElementById('p-in'); if(p)p.textContent=inRecs.filter(r=>r.status!=='Received').length;
 }
 
@@ -2529,6 +2744,28 @@ function taskStatus(r){
   return 'open';
 }
 
+// ── TASK FORM: INVENTORY ITEM BUILDER (temp state while composing the form) ──
+let tmpTaskInvItems = [];
+function toggleTaskInvUI(){
+  const on = document.getElementById('tk-inv-chk').checked;
+  document.getElementById('tk-inv-wrap').style.display = on ? 'block' : 'none';
+}
+function renderTaskInvItemsForm(){
+  const wrap = document.getElementById('tk-inv-list'); if(!wrap) return;
+  wrap.innerHTML = tmpTaskInvItems.map((name,i)=>`
+    <div class="inv-item-form-row"><span>${esc(name)}</span><button type="button" onclick="removeTaskInvItem(${i})">✕</button></div>`).join('');
+}
+function addTaskInvItem(){
+  const inp = document.getElementById('tk-inv-item-inp');
+  const name = inp.value.trim();
+  if(!name) return;
+  tmpTaskInvItems.push(name);
+  inp.value = '';
+  renderTaskInvItemsForm();
+  inp.focus();
+}
+function removeTaskInvItem(i){ tmpTaskInvItems.splice(i,1); renderTaskInvItemsForm(); }
+
 function openTaskForm(key){
   editKey.task = key||null;
   const r = key ? taskRecs.find(x=>x._k===key) : null;
@@ -2536,7 +2773,13 @@ function openTaskForm(key){
   document.getElementById('tk-title').value    = r?.title    ||'';
   document.getElementById('tk-due').value      = r?.dueDate  ||'';
   document.getElementById('tk-priority').value = r?.priority ||'Medium';
-  document.getElementById('tk-who').value      = r?.assignedTo||'';
+  document.getElementById('tk-reminder-freq').value = r?.reminderFreq || '';
+  assigneePickerState.task = r?.assignees ? r.assignees.map(a=>({...a})) : [];
+  renderAssigneePicker('task');
+  document.getElementById('tk-inv-chk').checked = r?.taskType==='inventory';
+  tmpTaskInvItems = (r?.taskType==='inventory' && r.items) ? r.items.map(it=>it.name) : [];
+  renderTaskInvItemsForm();
+  toggleTaskInvUI();
   document.getElementById('tk-notes').value    = r?.notes    ||'';
   openOv('form-task');
 }
@@ -2544,17 +2787,29 @@ function openTaskForm(key){
 function saveTask(){
   const title = document.getElementById('tk-title').value.trim();
   if(!title){alert('Task title is required.');return;}
+  const isInv = document.getElementById('tk-inv-chk').checked;
+  if(isInv && !tmpTaskInvItems.length){ alert('Add at least one inventory item, or uncheck the inventory list option.'); return; }
+  const existingFull = editKey.task ? taskRecs.find(x=>x._k===editKey.task) : null;
   const rec = {
     title,
     dueDate:    document.getElementById('tk-due').value,
     priority:   document.getElementById('tk-priority').value,
-    assignedTo: document.getElementById('tk-who').value.trim(),
+    assignees:  assigneePickerState.task.slice(),
+    reminderFreq: document.getElementById('tk-reminder-freq').value,
+    taskType:   isInv ? 'inventory' : 'general',
     notes:      document.getElementById('tk-notes').value.trim(),
-    done:       editKey.task ? (taskRecs.find(x=>x._k===editKey.task)?.done||false) : false,
+    done:       existingFull ? (existingFull.done||false) : false,
     updated:    new Date().toISOString()
   };
-  if(editKey.task){ R.tasks.child(editKey.task).update(rec).catch(e=>console.error(e)); }
-  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; R.tasks.push(rec).catch(e=>console.error(e)); }
+  rec.items = isInv ? tmpTaskInvItems.map(name=>{
+    const prior = existingFull?.items?.find(it=>it.name===name);
+    return { name, qty: prior?.qty || '' };
+  }) : null;
+  const wasEdit = !!editKey.task;
+  if(wasEdit){ R.tasks.child(editKey.task).update(rec).catch(e=>console.error(e)); }
+  else{ rec.created=new Date().toISOString(); rec.createdBy=myDisplayName()||'Unknown'; rec.createdByKey=myStaffKey||null; R.tasks.push(rec).catch(e=>console.error(e)); }
+  const notifyRec = wasEdit ? {...existingFull, ...rec} : rec;
+  notifyAssignees('task', notifyRec, wasEdit ? `Task updated: ${title}` : `New task assigned: ${title}`);
   closeAll();
 }
 
@@ -2564,11 +2819,61 @@ function toggleTaskDone(key){
   closeAll();
 }
 
+function updateTaskInvQty(key, index, value){
+  R.tasks.child(key).child('items').child(String(index)).update({qty:value});
+}
+
+function completeGeneralTask(key){
+  const r = taskRecs.find(x=>x._k===key); if(!r) return;
+  const note = document.getElementById('tk-complete-note')?.value.trim() || '';
+  R.tasks.child(key).update({done:true, completionNote:note, completedBy:myDisplayName()||'Unknown', completedAt:new Date().toISOString(), updated:new Date().toISOString()});
+  if(r.createdByKey) R.notify.push({staffKey:r.createdByKey, title:`Task done: ${r.title}`, body: note||'Marked complete.', kind:'task', created:new Date().toISOString()});
+  closeAll();
+  setTimeout(()=>openDetTask(key), 100);
+}
+
+function completeInventoryTask(key){
+  const r = taskRecs.find(x=>x._k===key); if(!r) return;
+  const blanks = (r.items||[]).filter(it=>it.qty===''||it.qty==null);
+  if(blanks.length){
+    const proceed = confirm(`You have ${blanks.length} item${blanks.length===1?'':'s'} left blank (${blanks.map(it=>it.name).join(', ')}). Mark complete anyway?`);
+    if(!proceed) return;
+  }
+  const summary = (r.items||[]).map(it=>`${it.name}: ${(it.qty!==''&&it.qty!=null)?it.qty:'—'}`).join('\n');
+  R.tasks.child(key).update({done:true, completedBy:myDisplayName()||'Unknown', completedAt:new Date().toISOString(), updated:new Date().toISOString()});
+  if(r.createdByKey) R.notify.push({staffKey:r.createdByKey, title:`Inventory task done: ${r.title}`, body: summary, kind:'task', created:new Date().toISOString()});
+  closeAll();
+  setTimeout(()=>openDetTask(key), 100);
+}
+
 function openDetTask(key){
   const r = taskRecs.find(x=>x._k===key); if(!r) return;
   const st = taskStatus(r);
   const badgeCls = st==='done'?'b-task-done':st==='overdue'?'b-task-overdue':'b-task-open';
   const badgeTxt = st==='done'?'Done':st==='overdue'?'Overdue':'Open';
+  const isInv = r.taskType==='inventory' && r.items;
+
+  let workHtml = '';
+  if(isInv){
+    const filled = r.items.filter(it=>it.qty!==''&&it.qty!=null).length;
+    workHtml = `<div class="dsec"><div class="dsec-title">Inventory List</div>
+      <div class="inv-progress">${filled} of ${r.items.length} filled in</div>
+      ${r.items.map((it,i)=>`
+        <div class="inv-item-row">
+          <span class="inv-item-name">${esc(it.name)}</span>
+          <input type="number" min="0" class="inv-item-qty${(it.qty!==''&&it.qty!=null)?' filled':''}" value="${esc(it.qty||'')}" placeholder="Qty" onchange="updateTaskInvQty('${key}',${i},this.value)" ${r.done?'disabled':''}>
+        </div>`).join('')}
+      ${!r.done?`<button class="sbtn-done" style="margin-top:8px;width:100%" onclick="completeInventoryTask('${key}')">✓ Mark Complete &amp; Notify</button>`:''}
+    </div>`;
+  } else if(!r.done){
+    workHtml = `<div class="dsec"><div class="dsec-title">Complete This Task</div>
+      <textarea id="tk-complete-note" placeholder="Anything worth noting? (optional)" style="width:100%;font-family:'Barlow',sans-serif;font-size:1rem;padding:10px 12px;border:1px solid var(--bd);border-radius:6px;min-height:64px"></textarea>
+      <button class="sbtn-done" style="margin-top:8px;width:100%" onclick="completeGeneralTask('${key}')">✓ Mark Done &amp; Notify</button>
+    </div>`;
+  } else if(r.completionNote){
+    workHtml = `<div class="dsec"><div class="dsec-title">Completion Note</div><div class="dval" style="white-space:pre-wrap">${esc(r.completionNote)}</div></div>`;
+  }
+
   document.getElementById('det-task-title').textContent = r.title||'Task';
   document.getElementById('det-task-body').innerHTML=`
     <div class="dsec"><div class="dsec-title">Status</div>
@@ -2579,18 +2884,25 @@ function openDetTask(key){
         <div style="grid-column:1/-1"><div class="dlbl">Title</div><div class="dval">${esc(r.title||'—')}</div></div>
         ${r.dueDate?`<div><div class="dlbl">Due Date</div><div class="dval" style="${st==='overdue'?'color:var(--red);font-weight:700':''}">${fmtDate(r.dueDate)}${st==='overdue'?' ⚠️':''}</div></div>`:''}
         ${r.priority?`<div><div class="dlbl">Priority</div><div class="dval">${TASK_URG_ICO[r.priority]||''} ${esc(r.priority)}</div></div>`:''}
-        ${r.assignedTo?`<div><div class="dlbl">Assigned To</div><div class="dval">${esc(r.assignedTo)}</div></div>`:''}
+        ${(r.assignees&&r.assignees.length)?`<div><div class="dlbl">Assigned To</div><div class="dval">${esc(r.assignees.map(a=>a.name).join(', '))}</div></div>`:''}
+        ${r.reminderFreq?`<div><div class="dlbl">Reminder</div><div class="dval">${esc(r.reminderFreq.charAt(0).toUpperCase()+r.reminderFreq.slice(1))}</div></div>`:''}
         ${r.createdBy?`<div><div class="dlbl">Added By</div><div class="dval">${esc(r.createdBy)}</div></div>`:''}
         ${r.notes?`<div style="grid-column:1/-1"><div class="dlbl">Notes</div><div class="dval" style="white-space:pre-wrap">${esc(r.notes)}</div></div>`:''}
       </div>
     </div>
+    ${workHtml}
     <div class="dsec"><div class="dsec-title">Notify</div>
       <div class="notify-row"><button class="sbtn-ghost" onclick="openCoworkerPopup('task','${key}')">👥 Text Coworker</button></div>
     </div>`;
   const toggleBtn = document.getElementById('det-task-toggle');
-  toggleBtn.textContent = r.done ? 'Mark Open' : 'Mark Done';
-  toggleBtn.style.background = r.done ? 'var(--amber)' : 'var(--green)';
-  toggleBtn.onclick = ()=>toggleTaskDone(key);
+  if(r.done){
+    toggleBtn.style.display = '';
+    toggleBtn.textContent = '↺ Reopen Task';
+    toggleBtn.style.background = 'var(--amber)';
+    toggleBtn.onclick = ()=>toggleTaskDone(key);
+  } else {
+    toggleBtn.style.display = 'none';
+  }
   document.getElementById('det-task-del').onclick = ()=>requireAdminDelete('Delete this task? This cannot be undone.',()=>{R.tasks.child(key).remove();closeAll();});
   document.getElementById('det-task-edit').onclick = ()=>{closeAll();openTaskForm(key);};
   openOv('det-task');
@@ -2598,7 +2910,7 @@ function openDetTask(key){
 
 function renderTasks(){
   const srch=(document.getElementById('srch-tasks')?.value||'').toLowerCase();
-  const filtered = taskRecs.filter(r=>!srch||`${r.title} ${r.assignedTo||''} ${r.notes||''}`.toLowerCase().includes(srch));
+  const filtered = taskRecs.filter(r=>!srch||`${r.title} ${(r.assignees||[]).map(a=>a.name).join(' ')} ${r.notes||''}`.toLowerCase().includes(srch));
   const open = filtered.filter(r=>!r.done);
   const done = filtered.filter(r=>r.done);
 
@@ -2617,7 +2929,7 @@ function renderTasks(){
       <div class="crow">
         <div class="crow-body">
           <div class="cname">${esc(r.title||'—')}</div>
-          <div class="cmeta">${[r.dueDate?'Due: '+fmtDate(r.dueDate):'',r.assignedTo?'→ '+r.assignedTo:'',r.priority?TASK_URG_ICO[r.priority]+' '+r.priority:''].filter(Boolean).map(esc).join(' · ')}</div>
+          <div class="cmeta">${[r.dueDate?'Due: '+fmtDate(r.dueDate):'',(r.assignees&&r.assignees.length)?'→ '+r.assignees.map(a=>a.name).join(', '):'',r.priority?TASK_URG_ICO[r.priority]+' '+r.priority:''].filter(Boolean).map(esc).join(' · ')}</div>
           ${r.createdBy?`<div class="card-added-by">Added by ${esc(r.createdBy)}</div>`:''}
         </div>
         <div class="crow-right"><span class="badge ${badgeCls}">${badgeTxt}</span></div>
