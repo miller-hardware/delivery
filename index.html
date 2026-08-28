@@ -390,15 +390,7 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
   #print-area{display:block!important;position:absolute;left:0;top:0;width:100%;background:#fff}
 }
 
-/* ── LOGIN GATE ── */
-#login-screen{display:none;position:fixed;inset:0;z-index:5000;background:var(--ink);align-items:center;justify-content:center;padding:20px}
-.login-card{width:100%;max-width:340px;background:var(--white);border-radius:10px;padding:28px 24px;border-top:5px solid var(--red)}
-.login-logo{font-family:'Barlow Condensed',sans-serif;font-size:1.6rem;font-weight:800;letter-spacing:1px;color:var(--ink);text-align:center;margin-bottom:4px}
-.login-logo span{color:var(--red)}
-.login-sub{text-align:center;font-size:.85rem;color:var(--g5);margin-bottom:20px}
-.login-card input{font-family:'Barlow',sans-serif;font-size:1rem;padding:11px 12px;border:1px solid var(--bd);border-radius:6px;outline:none;width:100%;margin-bottom:10px;background:var(--white);color:var(--ink)}
-.login-card input:focus{border-color:var(--red)}
-#login-err{color:var(--red);font-size:.82rem;min-height:16px;margin-bottom:8px;text-align:center}
+/* ── ACCOUNT STRIP (device staff identity, header) ── */
 .account-strip{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);padding:4px 10px;border-radius:20px}
 .account-name{font-family:'Barlow Condensed',sans-serif;font-size:.8rem;color:var(--g3);letter-spacing:.5px}
 .account-signout{background:none;border:none;color:var(--g3);font-family:'Barlow Condensed',sans-serif;font-size:.75rem;letter-spacing:1px;text-transform:uppercase;cursor:pointer;padding:0;text-decoration:underline}
@@ -408,25 +400,13 @@ nav{background:var(--g8);overflow-x:auto;white-space:nowrap;-webkit-overflow-scr
 </head>
 <body>
 
-<!-- LOGIN GATE -->
-<div id="login-screen">
-  <div class="login-card">
-    <div class="login-logo">MILLER <span>HARDWARE</span></div>
-    <div class="login-sub">Delivery — Yellville</div>
-    <input type="text" id="login-user" placeholder="Name or email" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
-    <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
-    <div id="login-err"></div>
-    <button id="login-btn" class="btn-save" style="width:100%;justify-content:center" onclick="doLogin()">Sign In</button>
-  </div>
-</div>
-
 <header>
   <div class="hdr">
     <div class="logo">MILLER <span>HARDWARE</span></div>
     <div class="hdr-right">
       <button class="guide-open-btn" onclick="openGuide()" title="Staff Guide">📖 Guide</button>
       <div class="sync"><div class="sdot conn" id="sdot"></div><span id="sync-txt">Connecting…</span></div>
-      <div class="account-strip" id="account-strip" style="display:none"><span class="account-name" id="account-name"></span><button class="account-signout" onclick="doLogout()">Sign Out</button></div>
+      <div class="account-strip" id="account-strip" style="display:none"><span class="account-name" id="account-name"></span><button class="account-signout" onclick="switchUser()">Not You?</button></div>
       <span class="loc-badge">Yellville</span>
     </div>
   </div>
@@ -1052,48 +1032,25 @@ const R = {
   notify: db.ref('dlv3_notify_outbox')
 };
 
-// ── AUTH (shared staff login — same Firebase Auth user pool as the Saw Shop app) ─
+// ── AUTH (silent, automatic — no password screen. Identity lives in device staff
+//    self-registration below, not here. This only exists so Firebase sees someone
+//    as "signed in" for the shared customers-node write rule.) ──────────────────
 let AUTH=null, CURRENT_USER=null;
-function showLogin(){
-  document.getElementById('login-screen').style.display='flex';
-  document.getElementById('app-body').style.visibility='hidden';
-}
-function hideLogin(){
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app-body').style.visibility='';
-}
+const WHOAMI_KEY = 'dlv3_whoami_name';
 function myDisplayName(){
-  if(!CURRENT_USER||!CURRENT_USER.email) return '';
-  let d = CURRENT_USER.email;
-  if(d.indexOf('@millersawshop.local')>0){ d=d.split('@')[0]; return d.charAt(0).toUpperCase()+d.slice(1); }
-  return d;
+  let cached = null;
+  try{ cached = localStorage.getItem(WHOAMI_KEY); }catch(e){}
+  return cached || '';
 }
-function doLogin(){
-  const v = (document.getElementById('login-user').value||'').trim();
-  const pw = document.getElementById('login-pass').value||'';
-  const le = document.getElementById('login-err'); le.textContent='';
-  if(!v||!pw){ le.textContent='Enter your name/email and password.'; return; }
-  const email = v.indexOf('@')>=0 ? v : (v.toLowerCase().replace(/\s+/g,'')+'@millersawshop.local');
-  const btn = document.getElementById('login-btn');
-  if(btn){ btn.disabled=true; btn.textContent='Signing in…'; }
-  AUTH.signInWithEmailAndPassword(email,pw).then(()=>{
-    document.getElementById('login-pass').value='';
-  }).catch(e=>{
-    const code = e&&e.code||'';
-    le.textContent = (code.indexOf('wrong-password')>=0||code.indexOf('user-not-found')>=0||code.indexOf('invalid-credential')>=0||code.indexOf('invalid-login')>=0) ? 'Wrong name or password.'
-      : (code.indexOf('operation-not-allowed')>=0||code.indexOf('configuration-not-found')>=0) ? "Sign-in isn't enabled yet — finish the Firebase setup step."
-      : code.indexOf('too-many-requests')>=0 ? 'Too many attempts — wait a minute and try again.'
-      : code.indexOf('network')>=0 ? 'No connection — check internet and try again.'
-      : (e.message||'Sign-in failed.');
-  }).then(()=>{ if(btn){ btn.disabled=false; btn.textContent='Sign In'; } });
-}
-function doLogout(){ if(AUTH){ AUTH.signOut(); location.reload(); } }
+function showLoading(){ document.getElementById('app-body').style.visibility='hidden'; }
+function hideLoading(){ document.getElementById('app-body').style.visibility=''; }
 
-showLogin();
+showLoading();
 AUTH = firebase.auth();
 AUTH.onAuthStateChanged(user=>{
   CURRENT_USER = user||null;
-  if(user){ hideLogin(); startDataSync(); } else { showLogin(); }
+  if(user){ hideLoading(); startDataSync(); }
+  else { AUTH.signInAnonymously().catch(e=>console.error('Silent sign-in failed:', e)); }
 });
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -1126,10 +1083,7 @@ let _synced = false;
 function startDataSync(){
   if(_synced) return;
   _synced = true;
-  const nameEl = document.getElementById('account-name');
-  if(nameEl) nameEl.textContent = myDisplayName();
-  const stripEl = document.getElementById('account-strip');
-  if(stripEl) stripEl.style.display = 'flex';
+  updateAccountStrip();
   setTimeout(checkWhoAmI, 800);
 
   db.ref('.info/connected').on('value', s => {
@@ -1848,13 +1802,26 @@ if(FCM_VAPID_KEY){
   }catch(e){}
 }
 
-// ── STAFF SELF-REGISTRATION (device-local — separate from the secure login) ──
-const WHOAMI_KEY = 'dlv3_whoami_name';
+// ── STAFF SELF-REGISTRATION (device-local — this IS the app's identity now) ──
 let myStaffKey = null;
 
 function findStaffKeyByName(name){
   const match = staffList.find(st=>st.name.toLowerCase()===name.toLowerCase());
   return match ? match._k : null;
+}
+
+function updateAccountStrip(){
+  const nameEl = document.getElementById('account-name');
+  if(nameEl) nameEl.textContent = myDisplayName();
+  const stripEl = document.getElementById('account-strip');
+  if(stripEl) stripEl.style.display = myDisplayName() ? 'flex' : 'none';
+}
+
+function switchUser(){
+  try{ localStorage.removeItem(WHOAMI_KEY); }catch(e){}
+  myStaffKey = null;
+  updateAccountStrip();
+  checkWhoAmI();
 }
 
 function checkWhoAmI(){
@@ -1863,6 +1830,7 @@ function checkWhoAmI(){
   if(cached){
     myStaffKey = findStaffKeyByName(cached);
     if(myStaffKey) registerForPush(myStaffKey);
+    updateAccountStrip();
     maybeShowInstallPrompt();
     return;
   }
@@ -1882,6 +1850,7 @@ function saveWhoAmI(){
     myStaffKey = newRef.key;
     registerForPush(newRef.key);
   }
+  updateAccountStrip();
   maybeShowInstallPrompt();
 }
 
@@ -3001,10 +2970,10 @@ function saveHours(){
 }
 
 // ── ADMIN-GATED DELETE (same accounts as the Saw Shop app) ────────────────────
-const ADMIN_EMAILS = ['mike_millerhardware@outlook.com','jake@millersawshop.local','michael@millersawshop.local'];
-function isAdmin(){ return !!(CURRENT_USER && CURRENT_USER.email && ADMIN_EMAILS.indexOf(CURRENT_USER.email.toLowerCase())>=0); }
+const ADMIN_NAMES = ['michael','mike','jake'];
+function isAdmin(){ const name=myDisplayName(); return !!(name && ADMIN_NAMES.indexOf(name.toLowerCase())>=0); }
 function requireAdminDelete(msg, fn){
-  if(!isAdmin()){ alert("Only an administrator can delete this.\n\nAsk Michael to sign in on his account to do it."); return; }
+  if(!isAdmin()){ alert("Only an administrator can delete this.\n\nAsk Michael to do it on his phone."); return; }
   if(confirm(msg)){ fn(); }
 }
 
@@ -3121,8 +3090,8 @@ buildAppIcons();
 
 // ── STAFF GUIDE ────────────────────────────────────────────────────────────────
 function guideSections(){return [
-['1. Signing In',
- "<p>Open the app on your phone or the shop tablet. Type your <strong>first name</strong> and your <strong>password</strong>, then tap <strong>Sign In</strong>. Your phone remembers you afterward, so you'll only need to do this once per device.</p><p>This same login works in the <strong>Saw Shop app</strong> too — one account, both apps.</p><p>Signing in for the first time? Accounts aren't self-service — ask Michael to set yours up.</p><p><strong>Right after your first sign-in on a device</strong>, it'll ask for your name again — this one's different, no password, and it's what lets people assign you tasks and deliveries and actually get your phone to notify you about them. It's required — there's no skipping it. Right after that, it'll walk you through adding the app to your home screen. Both only happen once per device.</p>"],
+['1. Getting Started (No Password)',
+ "<p>Open the app — no login screen, it just opens straight up. <strong>The first time on a device</strong>, it'll ask for your name (no password, nothing to remember) — this is what lets people assign you tasks and deliveries and actually get your phone to notify you about them. It's required, there's no skipping it.</p><p>Right after that, it'll walk you through adding the app to your home screen. Both only happen once per device — after that, it just opens straight into the app every time.</p><p>Wrong name showing, or handing the phone to someone else? Tap <strong>\"Not You?\"</strong> in the top right to switch.</p>"],
 ['2. The Tabs, at a Glance',
  "<ul><li><strong>Dashboard</strong> — calendar, today's stats, and your daily checklist.</li><li><strong>Deliveries</strong> — everything going out; tap + New to schedule one.</li><li><strong>Incoming</strong> — shipments coming in from vendors, including special orders for customers.</li><li><strong>Order List</strong> — yard items running low. No UPCs here — that's the POS's job.</li><li><strong>Equipment</strong> — trucks, forklifts, trailers — daily/weekly/monthly checks and an issue log for each one.</li><li><strong>Tasks</strong> — anything with a due date that isn't a delivery or a shipment.</li><li><strong>Settings</strong> — recurring checklist tasks, equipment check types, staff for texting, hours, and backups.</li></ul>"],
 ['3. Scheduling a Delivery',
@@ -3142,7 +3111,7 @@ function guideSections(){return [
 ['10. Handy Tips',
  "<ul><li><strong>👥 Text Coworker</strong> is on every card in every tab — no need to open the detail view first.</li><li><strong>Push notifications</strong> only work once you've allowed them when your phone's browser asks — if you tapped \"Block\" by mistake, you'll need to turn notifications back on for this site in your phone's browser settings.</li><li>Everything <strong>syncs live</strong> — what you change, everyone sees instantly.</li><li>The <strong>GPS pin-drop</strong> only needs you standing at the right spot once — it's saved for that delivery from then on.</li></ul>"],
 ["11. What's Admin-Only",
- "<p>Deleting anything — a delivery, a shipment, an order list item, a task, a piece of equipment — requires an administrator account. Everyone else gets a message asking them to have Michael sign in and do it. Everything else — scheduling, checks, tasks, texting — is yours to run.</p>"]
+ "<p>Deleting anything — a delivery, a shipment, an order list item, a task, a piece of equipment — is limited to Michael's name (or a couple others set up as admins). Everyone else gets a message asking them to have Michael do it on his phone. Everything else — scheduling, checks, tasks, texting — is yours to run.</p>"]
 ];}
 function buildGuideHTML(forPrint){
   const intro = forPrint
